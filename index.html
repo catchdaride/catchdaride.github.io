@@ -2,39 +2,240 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Catch Da Ride! - Public Transit Explorer</title>
+  <title>Catch Da Ride! - Public Transit Catchment & Bus Map Explorer</title>
+  <meta name="description" content="Drop a pin anywhere in Australia, UK, Canada, or Hong Kong to instantly discover connecting trains, trams, and buses in your walking catchment area.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <link rel="canonical" href="https://catchdaride.github.io/">
   <link rel="icon" type="image/png" href="https://geohoo.pythonanywhere.com/logo_header.png">
   <meta name="theme-color" content="#0f172a">
 
-  <!-- Open Graph for social sharing -->
-  <meta property="og:title" content="Catch Da Ride! - Public Transit Explorer">
-  <meta property="og:description" content="Drop a pin anywhere to discover connecting transit routes in your walking catchment.">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Catch Da Ride!">
+  <meta property="og:title" content="Catch Da Ride! - Public Transit Catchment Explorer">
+  <meta property="og:description" content="Discover connecting transit routes and walking catchments across 15 global cities with single-tap spatial exploration.">
+  <meta property="og:url" content="https://catchdaride.github.io/">
   <meta property="og:image" content="https://geohoo.pythonanywhere.com/og_preview.png">
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Catch Da Ride! - Public Transit Catchment Explorer">
+  <meta name="twitter:description" content="Discover connecting transit routes and walking catchments across 15 global cities with single-tap spatial exploration.">
+  <meta name="twitter:image" content="https://geohoo.pythonanywhere.com/og_preview.png">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "name": "Catch Da Ride!",
+        "url": "https://catchdaride.github.io/",
+        "description": "Interactive public transit catchment and walking radius explorer covering 15 global metropolitan regions.",
+        "applicationCategory": "MapsAndNavigationApplication",
+        "operatingSystem": "All",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    ]
+  }
+  </script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%;
       height: 100%;
-      height: 100dvh;
-      overflow: hidden;
       background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow-x: hidden;
+    }
+    .app-viewport {
+      width: 100%;
+      height: 100dvh;
+      position: relative;
     }
     iframe {
       width: 100%;
       height: 100%;
-      height: 100dvh;
       border: none;
       display: block;
+    }
+    .seo-directory {
+      background: #090d16;
+      border-top: 1px solid rgba(56, 189, 248, 0.2);
+      padding: 40px 20px 60px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .seo-directory h2 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #f8fafc;
+      margin-bottom: 8px;
+    }
+    .seo-directory p {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 28px;
+      line-height: 1.6;
+    }
+    .regions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 24px;
+    }
+    .region-block {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(51, 65, 85, 0.6);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .region-block h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .region-block h3 a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+    .region-block h3 a:hover {
+      text-decoration: underline;
+    }
+    .region-block ul {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .region-block li a {
+      font-size: 13px;
+      color: #cbd5e1;
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+    .region-block li a:hover {
+      color: #38bdf8;
     }
   </style>
 </head>
 <body>
-  <iframe
-    src="https://geohoo.pythonanywhere.com/?v=20261018c"
-    allow="geolocation"
-    allowfullscreen>
-  </iframe>
+  <!-- Full Interactive Map Experience -->
+  <main class="app-viewport">
+    <iframe
+      src="https://geohoo.pythonanywhere.com/?v=20261018d"
+      title="Catch Da Ride! Interactive Public Transit Explorer"
+      allow="geolocation"
+      allowfullscreen>
+    </iframe>
+  </main>
+
+  <!-- Crawlable Directory of Global Transit Hubs for Search Engines -->
+  <footer class="seo-directory">
+    <h2>Explore Public Transit Catchments Worldwide</h2>
+    <p>Select any city or transit hub below to visualize all connecting train, tram, and bus routes accessible within walking distance:</p>
+
+    <div class="regions-grid">
+      
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/melbourne/">🇦🇺 Melbourne & Victoria</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/melbourne/flinders-street/">Flinders Street Station</a></li><li><a href="https://catchdaride.github.io/melbourne/southern-cross/">Southern Cross Station</a></li><li><a href="https://catchdaride.github.io/melbourne/box-hill/">Box Hill Central</a></li><li><a href="https://catchdaride.github.io/melbourne/geelong-station/">Geelong Station</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/sydney/">🇦🇺 Sydney & New South Wales</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/sydney/central-station/">Sydney Central</a></li><li><a href="https://catchdaride.github.io/sydney/circular-quay/">Circular Quay</a></li><li><a href="https://catchdaride.github.io/sydney/parramatta/">Parramatta Station</a></li><li><a href="https://catchdaride.github.io/sydney/bondi-junction/">Bondi Junction</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/brisbane/">🇦🇺 Brisbane & Queensland</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/brisbane/central-station/">Brisbane Central</a></li><li><a href="https://catchdaride.github.io/brisbane/roma-street/">Roma Street</a></li><li><a href="https://catchdaride.github.io/brisbane/south-bank/">South Bank</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/adelaide/">🇦🇺 Adelaide & South Australia</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/adelaide/adelaide-station/">Adelaide Railway Station</a></li><li><a href="https://catchdaride.github.io/adelaide/paradise-interchange/">Paradise O-Bahn Interchange</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/perth/">🇦🇺 Perth & Western Australia</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/perth/perth-station/">Perth Station</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/canberra/">🇦🇺 Canberra & ACT</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/canberra/city-interchange/">City Interchange</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/hobart/">🇦🇺 Hobart & Tasmania</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/hobart/hobart-interchange/">Hobart Bus Interchange</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/darwin/">🇦🇺 Darwin & NT</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/darwin/darwin-interchange/">Darwin City Interchange</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/london/">🇬🇧 Greater London</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/london/kings-cross/">King's Cross St. Pancras</a></li><li><a href="https://catchdaride.github.io/london/waterloo/">London Waterloo</a></li><li><a href="https://catchdaride.github.io/london/piccadilly-circus/">Piccadilly Circus</a></li><li><a href="https://catchdaride.github.io/london/wimbledon/">Wimbledon Station</a></li><li><a href="https://catchdaride.github.io/london/canary-wharf/">Canary Wharf</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/birmingham/">🇬🇧 Birmingham & West Midlands</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/birmingham/new-street/">Birmingham New Street</a></li><li><a href="https://catchdaride.github.io/birmingham/coventry-station/">Coventry Station</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/toronto/">🇨🇦 Toronto & GTHA</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/toronto/union-station/">Union Station Toronto</a></li><li><a href="https://catchdaride.github.io/toronto/bloor-yonge/">Bloor-Yonge Station</a></li><li><a href="https://catchdaride.github.io/toronto/finch-station/">Finch Station</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/vancouver/">🇨🇦 Vancouver & Metro Vancouver</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/vancouver/waterfront/">Waterfront Station</a></li><li><a href="https://catchdaride.github.io/vancouver/commercial-broadway/">Commercial-Broadway</a></li><li><a href="https://catchdaride.github.io/vancouver/metrotown/">Metrotown Station</a></li>
+          </ul>
+        </div>
+
+        <div class="region-block">
+          <h3><a href="https://catchdaride.github.io/hong-kong/">🇭🇰 Hong Kong</a></h3>
+          <ul>
+            <li><a href="https://catchdaride.github.io/hong-kong/central-station/">Central Station</a></li><li><a href="https://catchdaride.github.io/hong-kong/admiralty-station/">Admiralty Station</a></li><li><a href="https://catchdaride.github.io/hong-kong/tsim-sha-tsui/">Tsim Sha Tsui Station</a></li><li><a href="https://catchdaride.github.io/hong-kong/mong-kok/">Mong Kok Station</a></li>
+          </ul>
+        </div>
+
+    </div>
+  </footer>
 </body>
 </html>
