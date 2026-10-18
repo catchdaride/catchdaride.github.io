@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bloor-Yonge Station Transit Catchment & Bus Map | Catch Da Ride!</title>
+  <meta name="description" content="The beating heart of Toronto's rapid transit system, transferring over 200,000 daily riders between Subway Line 1 and Subway Line 2.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <link rel="canonical" href="https://catchdaride.github.io/toronto/bloor-yonge/">
+  <link rel="icon" type="image/png" href="https://geohoo.pythonanywhere.com/logo_header.png">
+  <meta name="theme-color" content="#0f172a">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="place">
+  <meta property="og:site_name" content="Catch Da Ride!">
+  <meta property="og:title" content="Bloor-Yonge Station Transit Catchment Map | Catch Da Ride!">
+  <meta property="og:description" content="The beating heart of Toronto's rapid transit system, transferring over 200,000 daily riders between Subway Line 1 and Subway Line 2.">
+  <meta property="og:url" content="https://catchdaride.github.io/toronto/bloor-yonge/">
+  <meta property="og:image" content="https://geohoo.pythonanywhere.com/og_preview.png">
+  <meta property="place:location:latitude" content="43.6709">
+  <meta property="place:location:longitude" content="-79.3857">
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Bloor-Yonge Station Transit Catchment Map | Catch Da Ride!">
+  <meta name="twitter:description" content="The beating heart of Toronto's rapid transit system, transferring over 200,000 daily riders between Subway Line 1 and Subway Line 2.">
+  <meta name="twitter:image" content="https://geohoo.pythonanywhere.com/og_preview.png">
+
+  <!-- Structured Data: JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TransitStation",
+        "@id": "https://catchdaride.github.io/toronto/bloor-yonge/#station",
+        "name": "Bloor-Yonge Station",
+        "description": "The beating heart of Toronto's rapid transit system, transferring over 200,000 daily riders between Subway Line 1 and Subway Line 2.",
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 43.6709,
+          "longitude": -79.3857
+        },
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Toronto & GTHA",
+          "addressCountry": "CA"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://catchdaride.github.io/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Toronto & GTHA",
+            "item": "https://catchdaride.github.io/toronto/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "Bloor-Yonge Station",
+            "item": "https://catchdaride.github.io/toronto/bloor-yonge/"
+          }
+        ]
+      },
+      {
+        "@type": "WebApplication",
+        "name": "Catch Da Ride!",
+        "url": "https://catchdaride.github.io/",
+        "applicationCategory": "MapsAndNavigationApplication",
+        "operatingSystem": "All"
+      }
+    ]
+  }
+  </script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow-x: hidden;
+    }
+    .app-viewport {
+      width: 100%;
+      height: 100dvh;
+      position: relative;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+    .seo-card {
+      background: #090d16;
+      border-top: 1px solid rgba(56, 189, 248, 0.2);
+      padding: 36px 20px 60px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .breadcrumbs {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .breadcrumbs a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+    .breadcrumbs a:hover {
+      text-decoration: underline;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      color: #f8fafc;
+      margin-bottom: 10px;
+      letter-spacing: -0.02em;
+    }
+    .hub-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .mode-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .hub-desc {
+      font-size: 15px;
+      line-height: 1.6;
+      color: #cbd5e1;
+      margin-bottom: 24px;
+    }
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(51, 65, 85, 0.6);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 32px;
+    }
+    .detail-item strong {
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 4px;
+      letter-spacing: 0.05em;
+    }
+    .detail-item span {
+      font-size: 14px;
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin: 28px 0 12px;
+    }
+    .pills-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .hub-pill, .city-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(51, 65, 85, 0.7);
+      border-radius: 8px;
+      color: #f1f5f9;
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .hub-pill:hover, .city-pill:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+      color: #38bdf8;
+      transform: translateY(-1px);
+    }
+    .back-home-btn {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 10px 18px;
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: background 0.15s ease;
+    }
+    .back-home-btn:hover {
+      background: #0369a1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Full Interactive Spatial Catchment Map -->
+  <main class="app-viewport">
+    <iframe
+      src="https://geohoo.pythonanywhere.com/?lat=43.6709&lon=-79.3857&name=Bloor-Yonge%20Station&radius=400&v=20261018d"
+      title="Bloor-Yonge Station Interactive Catchment Map"
+      allow="geolocation"
+      allowfullscreen>
+    </iframe>
+  </main>
+
+  <!-- Crawlable Semantic Location Shell for Search Engines & Screen Readers -->
+  <footer class="seo-card">
+    <nav class="breadcrumbs" aria-label="Breadcrumbs">
+      <a href="https://catchdaride.github.io/">Home</a>
+      <span>›</span>
+      <a href="https://catchdaride.github.io/toronto/">Toronto & GTHA</a>
+      <span>›</span>
+      <span>Bloor-Yonge Station</span>
+    </nav>
+
+    <h1>🇨🇦 Bloor-Yonge Station Transit Catchment Map</h1>
+    <div class="hub-meta">
+      <span class="mode-badge">TTC Line 1 (Yonge-University)</span><span class="mode-badge">TTC Line 2 (Bloor-Danforth)</span>
+    </div>
+
+    <p class="hub-desc">The beating heart of Toronto's rapid transit system, transferring over 200,000 daily riders between Subway Line 1 and Subway Line 2.</p>
+
+    <div class="details-grid">
+      <div class="detail-item">
+        <strong>City & Region</strong>
+        <span>Toronto & GTHA, Canada</span>
+      </div>
+      <div class="detail-item">
+        <strong>Connecting Agencies</strong>
+        <span>Toronto Transit Commission (TTC)</span>
+      </div>
+      <div class="detail-item">
+        <strong>Station Coordinates</strong>
+        <span>43.6709, -79.3857</span>
+      </div>
+      <div class="detail-item">
+        <strong>Default Catchment</strong>
+        <span>400m (~5 min walking radius)</span>
+      </div>
+    </div>
+
+    <h2>Explore Other Hubs in Toronto & GTHA</h2>
+    <div class="pills-container">
+      <a class="hub-pill" href="https://catchdaride.github.io/toronto/union-station/">📍 Union Station Toronto</a>
+<a class="hub-pill" href="https://catchdaride.github.io/toronto/finch-station/">📍 Finch Station</a>
+
+    </div>
+
+    <h2>Explore Other Transit Regions Worldwide</h2>
+    <div class="pills-container">
+      <a class="city-pill" href="https://catchdaride.github.io/melbourne/">🇦🇺 Melbourne & Victoria</a>
+<a class="city-pill" href="https://catchdaride.github.io/sydney/">🇦🇺 Sydney & New South Wales</a>
+<a class="city-pill" href="https://catchdaride.github.io/brisbane/">🇦🇺 Brisbane & Queensland</a>
+<a class="city-pill" href="https://catchdaride.github.io/adelaide/">🇦🇺 Adelaide & South Australia</a>
+<a class="city-pill" href="https://catchdaride.github.io/perth/">🇦🇺 Perth & Western Australia</a>
+<a class="city-pill" href="https://catchdaride.github.io/canberra/">🇦🇺 Canberra & ACT</a>
+<a class="city-pill" href="https://catchdaride.github.io/hobart/">🇦🇺 Hobart & Tasmania</a>
+<a class="city-pill" href="https://catchdaride.github.io/darwin/">🇦🇺 Darwin & NT</a>
+<a class="city-pill" href="https://catchdaride.github.io/london/">🇬🇧 Greater London</a>
+<a class="city-pill" href="https://catchdaride.github.io/birmingham/">🇬🇧 Birmingham & West Midlands</a>
+<a class="city-pill" href="https://catchdaride.github.io/vancouver/">🇨🇦 Vancouver & Metro Vancouver</a>
+<a class="city-pill" href="https://catchdaride.github.io/hong-kong/">🇭🇰 Hong Kong</a>
+
+    </div>
+
+    <div>
+      <a class="back-home-btn" href="https://catchdaride.github.io/">🗺️ Open Catch Da Ride Global Map</a>
+    </div>
+  </footer>
+</body>
+</html>
