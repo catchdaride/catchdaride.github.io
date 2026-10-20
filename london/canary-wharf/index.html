@@ -223,6 +223,95 @@
     .back-home-btn:hover {
       background: #0369a1;
     }
+
+    html {
+      scroll-behavior: smooth;
+    }
+    .explore-directory-pill {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 22px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 9999px;
+      color: #f8fafc;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      letter-spacing: -0.01em;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 189, 248, 0.2);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+      animation: pill-float 3s ease-in-out infinite;
+    }
+    .explore-directory-pill:hover {
+      background: rgba(30, 41, 59, 0.98);
+      border-color: #38bdf8;
+      color: #38bdf8;
+      transform: translateX(-50%) translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 22px rgba(56, 189, 248, 0.35);
+      animation: none;
+    }
+    .explore-directory-pill .pill-icon {
+      font-size: 14px;
+      line-height: 1;
+    }
+    .explore-directory-pill .pill-arrow {
+      font-size: 14px;
+      color: #38bdf8;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+    .explore-directory-pill:hover .pill-arrow {
+      transform: translateY(2px);
+    }
+    @keyframes pill-float {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-4px); }
+    }
+    @media (max-width: 640px) {
+      .explore-directory-pill {
+        bottom: 18px;
+        padding: 8px 18px;
+        font-size: 12px;
+      }
+    }
+    .back-to-top-container {
+      text-align: center;
+      margin-top: 36px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    .back-to-map-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 20px;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 9999px;
+      color: #38bdf8;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .back-to-map-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+      transform: translateY(-1px);
+    }
+
   </style>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-PXS9EB0K7K"></script>
@@ -243,10 +332,15 @@
       allow="geolocation"
       allowfullscreen>
     </iframe>
+    <a href="#hub-details" class="explore-directory-pill" id="explore-directory-pill" aria-label="Explore Station Details &amp; Connections">
+      <span class="pill-icon">🚏</span>
+      <span class="pill-text">Explore Station Details &amp; Connections</span>
+      <span class="pill-arrow" aria-hidden="true">▾</span>
+    </a>
   </main>
 
   <!-- Crawlable Semantic Location Shell for Search Engines & Screen Readers -->
-  <footer class="seo-card">
+  <footer class="seo-card" id="hub-details">
     <nav class="breadcrumbs" aria-label="Breadcrumbs">
       <a href="https://catchdaride.github.io/">Home</a>
       <span>›</span>
@@ -304,10 +398,18 @@
 <a class="city-pill" href="https://catchdaride.github.io/toronto/">🇨🇦 Toronto & GTHA</a>
 <a class="city-pill" href="https://catchdaride.github.io/vancouver/">🇨🇦 Vancouver & Metro Vancouver</a>
 <a class="city-pill" href="https://catchdaride.github.io/hong-kong/">🇭🇰 Hong Kong</a>
+<a class="city-pill" href="https://catchdaride.github.io/san-francisco/">🇺🇸 San Francisco & Bay Area</a>
+<a class="city-pill" href="https://catchdaride.github.io/new-york/">🇺🇸 New York & New Jersey Metro</a>
 
     </div>
 
-    <div>
+    <div class="back-to-top-container">
+      <a href="#" class="back-to-map-btn" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); return false;">
+        <span>▴ Back to Interactive Map</span>
+      </a>
+    </div>
+
+    <div style="margin-top: 16px;">
       <a class="back-home-btn" href="https://catchdaride.github.io/">🗺️ Open Catch Da Ride Global Map</a>
     </div>
   </footer>
