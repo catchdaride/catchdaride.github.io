@@ -97,7 +97,25 @@
       display: block;
     }
   </style>
-  <!-- Google tag (gtag.js) -->
+  <!-- Google tag (gtag.js) with Tester Opt-Out Switch (?optout=1 / ?optout=0) -->
+  <script>
+    (function() {
+      var GA_ID = 'G-PXS9EB0K7K';
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var optout = params.get('optout');
+        if (optout === '1') {
+          localStorage.setItem('ga_optout', 'true');
+        } else if (optout === '0') {
+          localStorage.removeItem('ga_optout');
+        }
+        if (localStorage.getItem('ga_optout') === 'true') {
+          window['ga-disable-G-PXS9EB0K7K'] = true;
+          console.info('🚫 [GA4] Google Analytics tracking is disabled for this browser (optout active).');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-PXS9EB0K7K"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -114,5 +132,20 @@
     allow="geolocation"
     allowfullscreen>
   </iframe>
+  <script>
+    (function() {
+      try {
+        var opt = localStorage.getItem('ga_optout');
+        var qOpt = new URLSearchParams(window.location.search).get('optout');
+        var val = (qOpt === '0') ? '0' : ((opt === 'true' || qOpt === '1') ? '1' : null);
+        if (val !== null) {
+          var frame = document.querySelector('iframe');
+          if (frame && frame.src && !frame.src.includes('optout=')) {
+            frame.src += (frame.src.includes('?') ? '&' : '?') + 'optout=' + val;
+          }
+        }
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>
