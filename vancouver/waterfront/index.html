@@ -6,8 +6,9 @@
   <meta name="description" content="Vancouver's historic multimodal hub uniting the Expo Line, Canada Line (YVR Airport direct), SeaBus catamarans across Burrard Inlet, and commuter rail.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <link rel="canonical" href="https://catchdaride.github.io/vancouver/waterfront/">
-  <link rel="icon" type="image/png" href="https://geohoo.pythonanywhere.com/logo_header.png">
+  <link rel="icon" type="image/png" href="/logo_header.png">
   <meta name="theme-color" content="#0f172a">
+  <meta name="api-base" content="https://geohoo.pythonanywhere.com">
 
   <!-- Open Graph -->
   <meta property="og:type" content="place">
@@ -24,6 +25,17 @@
   <meta name="twitter:title" content="Vancouver Waterfront Station Transit Catchment Map | Catch Da Ride!">
   <meta name="twitter:description" content="Vancouver's historic multimodal hub uniting the Expo Line, Canada Line (YVR Airport direct), SeaBus catamarans across Burrard Inlet, and commuter rail.">
   <meta name="twitter:image" content="https://geohoo.pythonanywhere.com/og_preview.png">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/style.css?v=20261019a">
 
   <!-- Structured Data (JSON-LD) -->
   <script type="application/ld+json">
@@ -89,13 +101,6 @@
       overflow: hidden;
       background-color: #0f172a;
     }
-    iframe {
-      width: 100%;
-      height: 100%;
-      height: 100dvh;
-      border: none;
-      display: block;
-    }
   </style>
   <!-- Google tag (gtag.js) with Tester Opt-Out Switch (?optout=1 / ?optout=0) -->
   <script>
@@ -125,27 +130,604 @@
     gtag('config', 'G-PXS9EB0K7K');
   </script>
 </head>
-<body>
-  <iframe
-    src="https://geohoo.pythonanywhere.com/?lat=49.2856&lon=-123.1118&name=Vancouver%20Waterfront%20Station&radius=400&v=20261019a"
-    title="Vancouver Waterfront Station Interactive Catchment Map"
-    allow="geolocation"
-    allowfullscreen>
-  </iframe>
+<body data-deep-link="?lat=49.2856&lon=-123.1118&radius=400">
+<div id="app-container" class="app-container">
+    
+    <!-- Top Floating Control Bar -->
+    <header class="top-bar" id="top-bar">
+      <div class="top-bar-left">
+        <button id="sidebar-toggle-btn" class="icon-btn" aria-label="Toggle Navigation Sidebar" title="Toggle Sidebar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <div class="brand">
+          <img src="logo_header.png" alt="Catch Da Ride! Logo" class="brand-logo">
+          <span class="brand-title">Catch Da Ride!</span>
+          <span class="brand-badge">BETA</span>
+          <span class="brand-sub">Transit Explorer</span>
+        </div>
+      </div>
+
+      <!-- Searchable Location Bar -->
+      <div class="query-location-card" id="query-location-card" title="Search address, station, or place">
+        <span class="location-search-icon" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </span>
+        <input type="text" id="location-search-input" class="location-search-input" placeholder="Search stops, lines, or places" value="" autocomplete="off" spellcheck="false" aria-label="Search location">
+        <button id="location-clear-btn" class="location-clear-btn" aria-label="Clear search" title="Clear search" style="display: none;">&times;</button>
+        <span class="location-name" style="display:none;" id="query-location-name"></span>
+        <div id="location-suggestions-dropdown" class="location-suggestions-dropdown" role="listbox" aria-label="Location suggestions"></div>
+      </div>
+
+      <!-- Top Bar Actions (GPS Locate) -->
+      <div class="top-bar-actions">
+        <button id="locate-me-btn" class="icon-btn" aria-label="Use GPS My Location" title="Find My Location">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+      </div>
+
+      <!-- Top Bar Controls -->
+      <div class="top-bar-controls" id="top-bar-controls" style="display:none;"></div>
+    </header>
+
+    <!-- Main Workspace (Sidebar + Map) -->
+    <div class="main-layout" id="main-layout">
+      
+      <!-- Collapsible Desktop Sidebar (380px) -->
+      <aside class="sidebar" id="sidebar">
+        <!-- Routes List -->
+        <div class="routes-list" id="routes-list">
+          <!-- Dynamically populated route cards -->
+        </div>
+      </aside>
+
+      <!-- Map Container -->
+      <main class="map-viewport">
+                <!-- Semantic Hub SEO Overlay Banner (Native SEO Architecture) -->
+        <header class="hub-seo-banner" id="hub-seo-banner">
+          <div class="hub-seo-box">
+            <div class="hub-seo-header-row">
+              <nav aria-label="Breadcrumb" class="hub-breadcrumbs">
+                <ol class="breadcrumb-list">
+                  <li class="breadcrumb-item"><a href="/">Home</a></li>
+                  <li class="breadcrumb-sep">/</li>
+                  <li class="breadcrumb-item"><a href="/vancouver/">Vancouver & Metro Vancouver</a></li>
+                  <li class="breadcrumb-sep">/</li>
+                  <li class="breadcrumb-item active" aria-current="page">Vancouver Waterfront Station</li>
+                </ol>
+              </nav>
+              <button class="hub-seo-collapse-btn" id="hub-seo-collapse-btn" aria-expanded="true" aria-label="Toggle details">
+                <span class="collapse-icon">✕</span>
+              </button>
+            </div>
+            <div class="hub-seo-body" id="hub-seo-body">
+              <h1>Vancouver Waterfront Station Public Transit Catchment Map</h1>
+              <p class="hub-seo-desc">Vancouver's historic multimodal hub uniting the Expo Line, Canada Line (YVR Airport direct), SeaBus catamarans across Burrard Inlet, and commuter rail.</p>
+              <div class="hub-seo-meta-group">
+                <div class="hub-seo-meta-row">
+                  <span class="meta-badge-label">Modes:</span>
+                  <div class="transit-mode-chips"><span class="mode-chip">SkyTrain (Expo & Canada Lines)</span><span class="mode-chip">SeaBus (North Shore)</span><span class="mode-chip">West Coast Express</span><span class="mode-chip">Trolleybuses</span></div>
+                </div>
+                <div class="hub-seo-meta-row">
+                  <span class="meta-badge-label">Agencies:</span>
+                  <div class="agency-chips"><span class="agency-chip">TransLink (British Columbia)</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div id="map" class="map-canvas map-viewport"></div>
+
+        <!-- Map Control: Catchment Radius (Positioned under Base Layers icon) -->
+        <div id="catchment-control" class="leaflet-control-catchment leaflet-control">
+          <button id="catchment-toggle-btn" class="catchment-toggle-btn" aria-label="Walking Catchment Radius" title="Walking Catchment Radius: 400m">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" stroke-dasharray="3.5 3"></circle>
+              <circle cx="12" cy="12" r="3.2" fill="#ef4444" stroke="#ffffff" stroke-width="1.5"></circle>
+              <line x1="12" y1="12" x2="19" y2="7" stroke="#ef4444" stroke-width="2.2"></line>
+            </svg>
+          </button>
+          
+          <div id="catchment-dropdown" class="catchment-dropdown" role="dialog" aria-label="Choose Catchment Radius">
+            <div class="catchment-dropdown-header">
+              <div class="catchment-dropdown-title-row">
+                <span class="catchment-icon-small">🎯</span>
+                <strong>Walking Catchment</strong>
+              </div>
+              <span class="catchment-dropdown-sub">Select search radius:</span>
+            </div>
+            <div class="radius-control-group" id="radius-control-group">
+              <button class="radius-btn" data-radius="200" title="200m walk (~2.5 mins)">
+                <div class="radius-btn-content">
+                  <span class="radius-val">200m</span>
+                  <span class="radius-desc">Quick stroll • ~2.5 mins</span>
+                </div>
+                <span class="radius-check">✓</span>
+              </button>
+              <button class="radius-btn active" data-radius="400" title="400m walk (~5 mins - Standard)">
+                <div class="radius-btn-content">
+                  <span class="radius-val">400m</span>
+                  <span class="radius-desc">Standard walk • ~5 mins</span>
+                </div>
+                <span class="radius-check">✓</span>
+              </button>
+              <button class="radius-btn" data-radius="800" title="800m walk (~10 mins)">
+                <div class="radius-btn-content">
+                  <span class="radius-val">800m</span>
+                  <span class="radius-desc">Moderate walk • ~10 mins</span>
+                </div>
+                <span class="radius-check">✓</span>
+              </button>
+              <button class="radius-btn" data-radius="1200" title="1200m walk (~15 mins)">
+                <div class="radius-btn-content">
+                  <span class="radius-val">1200m</span>
+                  <span class="radius-desc">Extended walk • ~15 mins</span>
+                </div>
+                <span class="radius-check">✓</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map Control: Transit Modality Filters (Square button on top-left of map) -->
+        <div id="modal-filter-control" class="leaflet-control-modal-filter leaflet-control">
+          <button id="modal-filter-toggle-btn" class="modal-filter-toggle-btn" aria-label="Filter Transit Modes" title="Filter Transit Modes">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 6h16M4 12h16M4 18h16"></path>
+              <circle cx="8" cy="6" r="2.2" fill="currentColor"></circle>
+              <circle cx="16" cy="12" r="2.2" fill="currentColor"></circle>
+              <circle cx="10" cy="18" r="2.2" fill="currentColor"></circle>
+            </svg>
+            <span id="filter-active-dot" class="filter-active-dot hidden" title="Filters active"></span>
+          </button>
+          
+          <div id="modal-filter-dropdown" class="modal-filter-dropdown" role="dialog" aria-label="Filter Transit Modes">
+            <div class="modal-filter-dropdown-header">
+              <div class="modal-filter-dropdown-title-row">
+                <span class="modal-filter-icon-small">🚏</span>
+                <strong>Transit Modes</strong>
+              </div>
+              <span class="modal-filter-dropdown-sub">Filter network categories:</span>
+            </div>
+            <div class="modal-filters-list" id="modal-filters-group">
+              <label class="modal-filter-row" title="Metro Trains">
+                <input type="checkbox" id="filter-train" checked>
+                <span class="modal-filter-icon">🚆</span>
+                <span class="modal-filter-name">Trains</span>
+                <span class="modal-filter-check">✓</span>
+              </label>
+              <label class="modal-filter-row" title="Yarra Trams">
+                <input type="checkbox" id="filter-tram" checked>
+                <span class="modal-filter-icon">🚊</span>
+                <span class="modal-filter-name">Trams</span>
+                <span class="modal-filter-check">✓</span>
+              </label>
+              <label class="modal-filter-row" title="SmartBus DART & Orbital">
+                <input type="checkbox" id="filter-smartbus" checked>
+                <span class="modal-filter-icon">⚡</span>
+                <span class="modal-filter-name">SmartBus</span>
+                <span class="modal-filter-check">✓</span>
+              </label>
+              <label class="modal-filter-row" title="Peak Express & SkyBus">
+                <input type="checkbox" id="filter-express" checked>
+                <span class="modal-filter-icon">🚀</span>
+                <span class="modal-filter-name">Express</span>
+                <span class="modal-filter-check">✓</span>
+              </label>
+              <label class="modal-filter-row" title="Regular Bus Network">
+                <input type="checkbox" id="filter-local" checked>
+                <span class="modal-filter-icon">🚌</span>
+                <span class="modal-filter-name">Buses</span>
+                <span class="modal-filter-check">✓</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map Control: Help & Catchment Guide (Positioned in topright corner of map) -->
+        <div id="map-help-control" class="leaflet-control-help leaflet-control">
+          <button id="map-help-btn" class="map-help-btn" aria-label="About Catch Da Ride &amp; Help" title="About &amp; Help">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </button>
+          
+          <!-- Centered Modal Backdrop -->
+          <div id="map-help-backdrop" class="map-help-backdrop" aria-hidden="true"></div>
+
+          <!-- Centered About & Help Pop-up Modal -->
+          <div id="map-help-popover" class="map-help-popover about-modal" role="dialog" aria-modal="true" aria-label="About Catch Da Ride">
+            <button id="close-map-help-btn" class="map-help-close-btn" aria-label="Close About Dialog" title="Close (Esc)">&times;</button>
+            <div class="about-hero">
+              <img src="logo_header.png" alt="Catch Da Ride! Logo" class="about-hero-logo">
+              <div class="about-hero-content">
+                <div class="about-title-row">
+                  <h2 class="about-app-name">Catch Da Ride!</h2>
+                  <span class="about-badge-beta">BETA</span>
+                </div>
+                <div class="about-version-row">
+                  <span class="about-version-badge">Version 0.6.0</span>
+                  <span class="about-meta-tag">Transit Platform</span>
+                </div>
+                <p class="about-app-desc">Interactive public transit catchment &amp; walking radius explorer</p>
+              </div>
+            </div>
+
+            <div class="about-divider"></div>
+
+            <div class="map-help-body">
+              <div class="map-help-title-row">
+                <span class="map-help-icon">🎯</span>
+                <strong>Set Your Catchment</strong>
+              </div>
+              <ul class="map-help-list">
+                <li>
+                  <span class="help-bullet-icon">📍</span>
+                  <div class="help-bullet-content">
+                    <strong>Set Location:</strong>
+                    <div class="help-sub-item">• <strong>Mobile:</strong> Long press anywhere on the map</div>
+                    <div class="help-sub-item">• <strong>Desktop:</strong> Right-click or hold left-click</div>
+                  </div>
+                </li>
+                <li>
+                  <span class="help-bullet-icon">🔴</span>
+                  <div><strong>Drag Pin:</strong> Drag the red pin marker directly across the map to adjust your walking origin.</div>
+                </li>
+                <li>
+                  <span class="help-bullet-icon">🎯</span>
+                  <div><strong>Change Radius:</strong> Tap the catchment icon (bottom-left) to choose 200m, 400m, 800m, or 1200m walking radius.</div>
+                </li>
+              </ul>
+            </div>
+
+            <div class="about-footer">
+              <span class="about-footer-icon">🌏</span>
+              <span class="about-footer-text">Covering 15 regions across Australia, US, UK, Canada &amp; Hong Kong</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map Corner Top-Left: Routes Chips -->
+        <div class="corner-visible-routes" id="corner-visible-routes">
+          <div class="corner-label" id="corner-visible-routes-label" role="button" tabindex="0" title="Toggle Routes">
+            <span>Routes</span>
+            <span class="corner-toggle-icon" id="corner-toggle-icon">▾</span>
+          </div>
+          <div class="visible-chips-container" id="visible-chips-container">
+            <!-- Dynamically filled with pills -->
+          </div>
+        </div>
+
+        <!-- Map Corner Bottom-Right: Frequency Legend Button & Layer Button -->
+        <div class="corner-legend-control" id="corner-legend-control">
+          <div class="corner-bottom-right-bar" id="corner-bottom-right-bar">
+            <button id="open-legend-btn" class="legend-badge-btn" title="Route Styling &amp; Transit Mode Legend">
+              <span class="legend-icon">🗺️</span>
+              <span>Map Legend</span>
+            </button>
+            <div id="layer-control-mount" class="layer-control-mount" title="Base Map Layers"></div>
+          </div>
+        </div>
+
+        <!-- Transit & Frequency Legend Modal -->
+        <div class="legend-card" id="legend-card">
+          <div class="legend-header">
+            <h4>Transit &amp; Route Conventions</h4>
+            <button id="close-legend-btn" class="close-btn">&times;</button>
+          </div>
+          <div class="legend-body">
+            <!-- Transit Modes Section -->
+            <div class="legend-section-title">Transit Modes</div>
+            <div class="legend-item">
+              <div class="legend-line line-train"></div>
+              <div class="legend-text">
+                <strong>Heavy Rail / Train</strong>
+                <span>Ballasted track ╪╪╪╪ • GO Train, Overground, Commuter</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line line-tube"></div>
+              <div class="legend-text">
+                <strong>Metro / Tube / Subway</strong>
+                <span>Cased rapid transit ribbon • Subway, MTR, SkyTrain</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line line-tram"></div>
+              <div class="legend-text">
+                <strong>Tram / Light Rail</strong>
+                <span>Surface rail dash • Streetcars, Trams, DLR</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line line-bus"></div>
+              <div class="legend-text">
+                <strong>Bus / Wheels</strong>
+                <span>Smooth road corridor • Express, BRT &amp; Local buses</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line line-ferry"></div>
+              <div class="legend-text">
+                <strong>Ferry / Waterway</strong>
+                <span>Nautical fairway dash • Harbour &amp; river ferries</span>
+              </div>
+            </div>
+
+            <div class="legend-divider"></div>
+
+            <!-- Frequency Conventions Section -->
+            <div class="legend-section-title">Frequency Conventions</div>
+            <div class="legend-item">
+              <div class="legend-line line-frequent"></div>
+              <div class="legend-text">
+                <strong>Frequent / Rapid (≤ 15 mins)</strong>
+                <span>Bold solid line (4.8px) • Rail, Metro &amp; Express Spines</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line line-regular"></div>
+              <div class="legend-text">
+                <strong>Regular Network (15–30 mins)</strong>
+                <span>Standard solid line (3.2px) • Regular Buses</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line line-infrequent"></div>
+              <div class="legend-text">
+                <strong>Infrequent / Coverage (&gt; 30 mins)</strong>
+                <span>Thin solid line (2.2px) • Regional Coaches</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line line-limited"></div>
+              <div class="legend-text">
+                <strong>Peak-Only Service</strong>
+                <span>Dashed line ('7, 5', 2.3px) • Rush-hour trippers only</span>
+              </div>
+            </div>
+            <div class="legend-divider"></div>
+            <div class="legend-item">
+              <div class="legend-line line-variation-peak"></div>
+              <div class="legend-text">
+                <strong>Peak Extension Corridor</strong>
+                <span>Long dash ('12, 8') • Freeway Express</span>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line line-variation-shuttle"></div>
+              <div class="legend-text">
+                <strong>Off-Peak Short-Turn Stub</strong>
+                <span>Dot-dash ('14, 6, 3, 6') • Local Connection</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Corridor Selection Modal / Popup -->
+        <div class="corridor-popup-modal" id="corridor-popup-modal">
+          <div class="corridor-header">
+            <h4>🛣️ Multi-Route Shared Corridor</h4>
+            <button id="close-corridor-btn" class="close-btn">&times;</button>
+          </div>
+          <p class="corridor-subtitle">Multiple transit routes travel along this roadway segment. Tap a route to inspect:</p>
+          <div class="corridor-routes-list" id="corridor-routes-list">
+            <!-- Dynamically populated from corridor click handler -->
+          </div>
+        </div>
+
+        <!-- Floating Pill: Set Catchment Here (UX-2) -->
+        <button id="viewport-catchment-pill" class="viewport-catchment-pill hidden" aria-label="Set Catchment Here">
+          <span class="pill-icon">🎯</span>
+          <span class="pill-text">Set Catchment Here</span>
+        </button>
+
+        <!-- Floating Empty Catchment Card (UX-1) -->
+        <div id="empty-catchment-card" class="empty-catchment-card hidden" role="alert">
+          <div class="empty-card-header">
+            <div class="empty-card-icon">🚏</div>
+            <div class="empty-card-titles">
+              <strong id="empty-card-title">No routes within 400m</strong>
+              <span id="empty-card-sub" class="empty-card-sub">Checking nearest transit stops...</span>
+            </div>
+            <button id="close-empty-card-btn" class="close-btn empty-card-close" aria-label="Dismiss">&times;</button>
+          </div>
+          <div class="empty-card-actions" id="empty-card-actions">
+            <button id="empty-expand-radius-btn" class="empty-action-btn primary">
+              <span>Expand to 800m</span>
+            </button>
+            <button id="empty-snap-stop-btn" class="empty-action-btn secondary">
+              <span>🎯 Snap to Stop</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Bottom Route Info Card (Floating box on route selection) -->
+        <div class="route-bottom-card" id="route-bottom-card">
+          <!-- Top Row: Route identity, title, via, and action buttons -->
+          <div class="bottom-card-top-row">
+            <div class="bottom-card-main" id="bottom-card-main" title="Tap to expand full route details">
+              <div class="bottom-card-badge-col">
+                <span class="route-chip bottom-route-chip" id="bottom-route-chip">906</span>
+                <span class="route-category-tag" id="bottom-route-category">SmartBus</span>
+              </div>
+              <div class="bottom-card-info-col">
+                <div class="bottom-card-title-row">
+                  <span class="bottom-card-title" id="bottom-route-title">City (Lonsdale St) - Warrandyte</span>
+                </div>
+                <div class="bottom-card-via" id="bottom-route-via">via Eastern Fwy &amp; Blackburn Rd</div>
+              </div>
+            </div>
+            <div class="bottom-card-actions">
+              <button id="bottom-card-fit-btn" class="bottom-card-btn bottom-card-fit-btn" title="Fit Map to Entire Route">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+                <span>Fit</span>
+              </button>
+              <button id="bottom-card-detail-btn" class="bottom-card-btn" title="View Detailed Route Timeline and Stops">
+                <span class="detail-btn-text-full">Detailed Info</span>
+                <span class="detail-btn-text-short">Details</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+              <button id="close-bottom-card-btn" class="close-btn bottom-card-close" aria-label="Dismiss Info" title="Dismiss (Esc)">&times;</button>
+            </div>
+          </div>
+
+          <!-- Bottom Row: Detailed Route Metrics & Operating Stats -->
+          <div class="bottom-card-details-row">
+            <div class="bottom-card-stat">
+              <span class="stat-icon">⏱️</span>
+              <span class="stat-label">Frequency:</span>
+              <strong id="bottom-route-freq" class="stat-val">Every 10-15 mins</strong>
+            </div>
+            <div class="bottom-card-stat">
+              <span class="stat-icon">🕒</span>
+              <span class="stat-label">Operating Span:</span>
+              <strong id="bottom-route-span" class="stat-val">24 hours (Night Network)</strong>
+            </div>
+            <div class="bottom-card-stat">
+              <span class="stat-icon">📏</span>
+              <span class="stat-label">Length:</span>
+              <strong id="bottom-route-dist" class="stat-val">31.4 km</strong>
+            </div>
+            <div class="bottom-card-stat">
+              <span class="stat-icon">🚏</span>
+              <span class="stat-label">Stops:</span>
+              <strong id="bottom-route-stops" class="stat-val">14 stops</strong>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+
+    <!-- Slide-Over Route Details Drawer (Option A Composite Model) -->
+    <div class="route-drawer" id="route-drawer">
+      <div class="drawer-drag-handle"></div>
+      <div class="drawer-header">
+        <!-- Route Drawer Header -->
+        <div class="drawer-route-badge-row">
+          <span class="route-badge-large" id="drawer-route-badge">906</span>
+          <div class="drawer-titles">
+            <h3 id="drawer-route-name">City (Lonsdale St) - Warrandyte</h3>
+            <span class="drawer-via" id="drawer-route-via">via Eastern Fwy &amp; Blackburn Rd</span>
+          </div>
+          <button id="drawer-fit-btn" class="drawer-fit-btn" title="Fit Map to Entire Route">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+            <span>Fit</span>
+          </button>
+          <button id="close-drawer-btn" class="close-btn drawer-close-btn" aria-label="Close Route Details" title="Close Route Details (Esc)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <!-- Service Variations Segmented Controls (for routes with variations like 305) -->
+        <div class="variations-selector-container" id="variations-selector-container">
+          <span class="variation-label">Service Variation:</span>
+          <div class="variation-pills" id="variation-pills"></div>
+        </div>
+
+        <div class="drawer-meta-grid">
+          <div class="drawer-meta-item">
+            <span class="meta-icon">⏱️</span>
+            <div>
+              <span class="meta-label">Frequency</span>
+              <strong id="drawer-frequency">Every 10-15 mins</strong>
+            </div>
+          </div>
+          <div class="drawer-meta-item">
+            <span class="meta-icon">🕒</span>
+            <div>
+              <span class="meta-label">Operating Span</span>
+              <strong id="drawer-span">24 hours (Night Network)</strong>
+            </div>
+          </div>
+          <div class="drawer-meta-item">
+            <span class="meta-icon">📏</span>
+            <div>
+              <span class="meta-label">Journey Length</span>
+              <strong id="drawer-distance">31.4 km</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stops Timeline -->
+      <div class="drawer-body">
+        <h4 class="timeline-title">Stops Sequence (<span id="timeline-stop-count">14</span> stops)</h4>
+        <div class="stops-timeline" id="stops-timeline">
+          <!-- Dynamically populated ordered stops -->
+        </div>
+      </div>
+
+      <!-- Drawer Dismiss Footer Button -->
+      <div class="drawer-footer">
+        <button id="drawer-dismiss-footer-btn" class="drawer-dismiss-btn" title="Close Route Details (Esc)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <span>Dismiss Route Details</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Drawer Backdrop Overlay -->
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+
+    <!-- Unsupported Location Modal Backdrop -->
+    <div class="unsupported-modal-backdrop hidden" id="unsupported-modal-backdrop"></div>
+
+    <!-- Floating Unsupported Location Modal / Popup -->
+    <div id="unsupported-location-modal" class="unsupported-location-modal hidden" role="dialog" aria-modal="true" aria-labelledby="unsupported-modal-title">
+      <div class="unsupported-modal-header">
+        <div class="unsupported-modal-icon">🌏</div>
+        <div class="unsupported-modal-titles">
+          <strong id="unsupported-modal-title" class="unsupported-modal-title">Location Not Supported Yet</strong>
+        </div>
+        <button id="close-unsupported-modal-btn" class="close-btn unsupported-modal-close" aria-label="Dismiss">&times;</button>
+      </div>
+      <div class="unsupported-modal-body">
+        <p class="unsupported-modal-hint">Catch Da Ride currently covers 15 regions across 4 countries. Tap any city below to explore its live catchment:</p>
+        <div class="unsupported-regions-container" id="unsupported-regions-container">
+          <!-- Dynamically populated from backend or fallback -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Hub Seed Location Initialization -->
   <script>
+    window.INITIAL_LOCATION = {
+      lat: 49.2856,
+      lon: -123.1118,
+      name: "Vancouver Waterfront Station",
+      radius: 400
+    };
     (function() {
-      try {
-        var opt = localStorage.getItem('ga_optout');
-        var qOpt = new URLSearchParams(window.location.search).get('optout');
-        var val = (qOpt === '0') ? '0' : ((opt === 'true' || qOpt === '1') ? '1' : null);
-        if (val !== null) {
-          var frame = document.querySelector('iframe');
-          if (frame && frame.src && !frame.src.includes('optout=')) {
-            frame.src += (frame.src.includes('?') ? '&' : '?') + 'optout=' + val;
-          }
-        }
-      } catch (e) {}
+      var btn = document.getElementById('hub-seo-collapse-btn');
+      var banner = document.getElementById('hub-seo-banner');
+      if (btn && banner) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var isCol = banner.classList.toggle('collapsed');
+          btn.setAttribute('aria-expanded', !isCol);
+          var icon = btn.querySelector('.collapse-icon');
+          if (icon) icon.textContent = isCol ? 'ℹ️' : '✕';
+        });
+      }
     })();
   </script>
+
+  <!-- Data & Application Logic -->
+  <script src="/pois_data.js?v=20261019a"></script>
+  <script src="/app.js?v=20261019a"></script>
 </body>
 </html>
