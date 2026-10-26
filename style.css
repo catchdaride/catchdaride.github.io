@@ -4193,4 +4193,112 @@ path.leaflet-interactive:active,
   max-width: 260px;
 }
 
+/* ==========================================================================
+   Share Location Button & Toast Notification (Issue #7)
+   ========================================================================== */
+#share-location-btn {
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              color 0.2s ease,
+              background 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+#share-location-btn:hover {
+  background: var(--bg-elevated);
+  border-color: #10b981;
+  color: #34d399;
+}
+
+#share-location-btn:active,
+#share-location-btn.btn-share-pulse {
+  animation: shareBtnPulse 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes shareBtnPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    border-color: #10b981;
+    color: #34d399;
+  }
+  35% {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+    border-color: #34d399;
+    color: #10b981;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.share-feedback-toast {
+  position: fixed;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid #10b981;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 16px rgba(16, 185, 129, 0.35);
+  color: #f8fafc;
+  padding: 10px 20px;
+  border-radius: 9999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.share-feedback-toast.toast-show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.share-feedback-toast.hidden {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(20px);
+  pointer-events: none;
+}
+
+.share-toast-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.share-toast-message {
+  color: #f1f5f9;
+}
+
+@media (max-width: 640px) {
+  .share-feedback-toast {
+    bottom: max(24px, env(safe-area-inset-bottom, 24px));
+    font-size: 12.5px;
+    padding: 8px 16px;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+  }
+}
+
+@media (max-width: 480px) {
+  .top-bar-actions {
+    gap: 6px;
+  }
+}
+
 
