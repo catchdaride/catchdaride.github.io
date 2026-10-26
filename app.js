@@ -637,10 +637,19 @@ class BusMapApp {
     // Check URL parameters for explicit deep-linked coordinates or hub/city targets (e.g. from SEO landing pages)
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const paramLat = parseFloat(urlParams.get('lat'));
-      const paramLon = parseFloat(urlParams.get('lon'));
+      let paramLat = parseFloat(urlParams.get('lat'));
+      let paramLon = parseFloat(urlParams.get('lon'));
       const paramName = urlParams.get('name') || urlParams.get('hub') || urlParams.get('location');
       const paramRadius = parseInt(urlParams.get('radius'), 10);
+
+      // Support hash coordinates (#lat,lon) as fallback
+      if ((isNaN(paramLat) || isNaN(paramLon)) && typeof window !== 'undefined' && window.location.hash) {
+        const hashMatch = window.location.hash.match(/^#?(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+        if (hashMatch) {
+          paramLat = parseFloat(hashMatch[1]);
+          paramLon = parseFloat(hashMatch[2]);
+        }
+      }
 
       if (!isNaN(paramRadius) && [200, 400, 800, 1200].includes(paramRadius)) {
         this.currentRadius = paramRadius;
@@ -1255,6 +1264,15 @@ class BusMapApp {
       });
     }
 
+    // Share Location Button (Issue #7)
+    const shareBtn = document.getElementById('share-location-btn');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.shareLocation();
+      });
+    }
+
     // Route Details Drawer Dismiss Buttons & Events
     const closeDrawerBtn = document.getElementById('close-drawer-btn');
     if (closeDrawerBtn) {
@@ -1585,6 +1603,129 @@ class BusMapApp {
     setTimeout(() => {
       toast.remove();
     }, 4000);
+  }
+
+  buildShareUrl() {
+    try {
+      if (this.queryPoint) {
+        this.updateUrlCoordinates(this.queryPoint.lat, this.queryPoint.lon, this.currentRadius);
+      }
+      const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : '';
+      const pathname = (typeof window !== 'undefined' && window.location.pathname) ? window.location.pathname : '/';
+      const search = (typeof window !== 'undefined' && window.location.search) ? window.location.search : '';
+
+      let hash = '';
+      if (this.queryPoint && typeof this.queryPoint.lat === 'number' && typeof this.queryPoint.lon === 'number') {
+        hash = `#${this.queryPoint.lat.toFixed(6)},${this.queryPoint.lon.toFixed(6)}`;
+      } else if (typeof window !== 'undefined' && window.location.hash) {
+        hash = window.location.hash;
+      }
+      return `${origin}${pathname}${search}${hash}`;
+    } catch (e) {
+      return (typeof window !== 'undefined') ? window.location.href : '';
+    }
+  }
+
+  async shareLocation() {
+    if (typeof trackAnalyticsEvent === 'function') {
+      trackAnalyticsEvent('share_location');
+    }
+
+    // Brief button active pulse / visual effect
+    const shareBtn = document.getElementById('share-location-btn');
+    if (shareBtn) {
+      shareBtn.classList.remove('btn-share-pulse');
+      void shareBtn.offsetWidth;
+      shareBtn.classList.add('btn-share-pulse');
+      setTimeout(() => shareBtn.classList.remove('btn-share-pulse'), 1000);
+    }
+
+    const url = this.buildShareUrl();
+    let locationName = '';
+    const locSearchInput = document.getElementById('location-search-input');
+    const locNameElem = document.getElementById('query-location-name');
+
+    if (this.lastSelectedLocationName && this.lastSelectedLocationName.trim()) {
+      locationName = this.lastSelectedLocationName.trim();
+    } else if (locSearchInput && locSearchInput.value && locSearchInput.value.trim()) {
+      locationName = locSearchInput.value.trim();
+    } else if (locNameElem && locNameElem.textContent && locNameElem.textContent.trim()) {
+      locationName = locNameElem.textContent.trim();
+    } else if (this.queryPoint) {
+      locationName = `Lat: ${Number(this.queryPoint.lat).toFixed(4)}, Lon: ${Number(this.queryPoint.lon).toFixed(4)}`;
+    } else {
+      locationName = 'this location';
+    }
+
+    const title = 'Catch Da Ride! - Walk & Ride';
+    const text = `Explore public transit within walking distance of ${locationName}`;
+
+    let shared = false;
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title, text, url });
+        shared = true;
+      } catch (err) {
+        console.info('navigator.share rejected or not completed, falling back to clipboard:', err);
+      }
+    }
+
+    if (!shared) {
+      await this.copyToClipboard(url);
+      this.showShareToast('Link copied to clipboard! 📋');
+    }
+  }
+
+  async copyToClipboard(text) {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      console.warn("navigator.clipboard.writeText failed, trying execCommand fallback:", e);
+    }
+    try {
+      if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return true;
+      }
+    } catch (e) {
+      console.warn("execCommand copy fallback failed:", e);
+    }
+    return false;
+  }
+
+  showShareToast(message = 'Link copied to clipboard! 📋') {
+    const toast = document.getElementById('share-feedback-toast');
+    if (!toast) return;
+    const msgElem = document.getElementById('share-toast-message');
+    if (msgElem) {
+      msgElem.textContent = message;
+    } else {
+      toast.textContent = message;
+    }
+    toast.classList.remove('hidden');
+    toast.classList.remove('toast-show');
+    void toast.offsetWidth;
+    toast.classList.add('toast-show');
+
+    if (this._shareToastTimer) clearTimeout(this._shareToastTimer);
+    this._shareToastTimer = setTimeout(() => {
+      toast.classList.remove('toast-show');
+      setTimeout(() => {
+        if (!toast.classList.contains('toast-show')) {
+          toast.classList.add('hidden');
+        }
+      }, 350);
+    }, 2800);
   }
 
   updateUrlCoordinates(lat, lon, radius) {
