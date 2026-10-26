@@ -143,7 +143,7 @@
           <img src="logo_header.png" alt="Catch Da Ride! Logo" class="brand-logo">
           <span class="brand-title">Catch Da Ride!</span>
           <span class="brand-badge">BETA</span>
-          <span class="brand-sub">Transit Explorer</span>
+          <span class="brand-sub">Walk & Ride</span>
         </div>
       </div>
 
@@ -161,10 +161,19 @@
         <div id="location-suggestions-dropdown" class="location-suggestions-dropdown" role="listbox" aria-label="Location suggestions"></div>
       </div>
 
-      <!-- Top Bar Actions (GPS Locate) -->
+      <!-- Top Bar Actions (GPS Locate & Share) -->
       <div class="top-bar-actions">
         <button id="locate-me-btn" class="icon-btn" aria-label="Use GPS My Location" title="Find My Location">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+        <button id="share-location-btn" class="icon-btn" aria-label="Share this location" title="Share this location">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
         </button>
       </div>
 
@@ -355,8 +364,7 @@
                   <span class="about-badge-beta">BETA</span>
                 </div>
                 <div class="about-version-row">
-                  <span class="about-version-badge">Version 0.6.1</span>
-                  <span class="about-meta-tag">Transit Platform</span>
+                  <span class="about-version-badge">Version 0.6.2</span>
                 </div>
                 <p class="about-app-desc">Interactive public transit catchment &amp; walking radius explorer</p>
               </div>
@@ -705,6 +713,12 @@
           <!-- Dynamically populated from backend or fallback -->
         </div>
       </div>
+    </div>
+
+    <!-- Floating Share Feedback Toast (Issue #7) -->
+    <div id="share-feedback-toast" class="share-feedback-toast hidden" role="status" aria-live="polite">
+      <span class="share-toast-icon">📋</span>
+      <span class="share-toast-message" id="share-toast-message">Link copied to clipboard! 📋</span>
     </div>
 
     <!-- Toast Notification Container -->
