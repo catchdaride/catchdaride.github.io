@@ -775,6 +775,23 @@ class BusMapApp {
     if (layerMount) {
       const layerContainer = this.layerControl.getContainer();
       if (layerContainer) {
+        // Issue #9: Strictly disable mouse-hover expansion so selector only opens on click
+        this.layerControl._expandSafely = function() {};
+        L.DomEvent.off(layerContainer, 'mouseenter');
+        L.DomEvent.off(layerContainer, 'mouseleave');
+        L.DomEvent.off(layerContainer, 'mouseover');
+        L.DomEvent.off(layerContainer, 'mouseout');
+
+        layerContainer.addEventListener('mouseenter', (e) => {
+          e.stopImmediatePropagation();
+        }, true);
+        layerContainer.addEventListener('mouseover', (e) => {
+          e.stopImmediatePropagation();
+        }, true);
+        layerContainer.addEventListener('mouseleave', (e) => {
+          e.stopImmediatePropagation();
+        }, true);
+
         layerMount.appendChild(layerContainer);
       }
     }
@@ -1082,14 +1099,15 @@ class BusMapApp {
       });
     }
 
-    // Base Layer Control Toggle & Dismissal
+    // Base Layer Control Toggle & Dismissal (Issue #9: First-click responsiveness & click-only expansion)
     const layerContainer = this.layerControl?.getContainer();
     const layerToggleBtn = layerContainer?.querySelector('.leaflet-control-layers-toggle');
     if (layerToggleBtn && layerContainer) {
       layerToggleBtn.addEventListener('click', (e) => {
-        if (layerContainer.classList.contains('leaflet-control-layers-expanded')) {
-          e.stopImmediatePropagation();
-          e.preventDefault();
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        const isExpanded = layerContainer.classList.contains('leaflet-control-layers-expanded');
+        if (isExpanded) {
           this.layerControl.collapse();
         } else {
           if (catchmentControl && catchmentControl.classList.contains('open')) {
@@ -1100,6 +1118,7 @@ class BusMapApp {
             modalFilterControl.classList.remove('open');
             if (modalFilterToggleBtn) modalFilterToggleBtn.classList.remove('active');
           }
+          this.layerControl.expand();
         }
       }, true);
 
@@ -1451,6 +1470,15 @@ class BusMapApp {
       });
     }
 
+    // Issue #5: Filter Empty Floating Pill Action
+    const filterEmptyEnableBtn = document.getElementById('filter-empty-enable-btn');
+    if (filterEmptyEnableBtn) {
+      filterEmptyEnableBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.resetModalFilters();
+      });
+    }
+
     // Escape Key Listener to dismiss drawer, bottom box, and open modals
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -1715,6 +1743,7 @@ class BusMapApp {
       this.renderSidebarRoutes([]);
       this.renderMapRoutes();
       this.updateVisibleRoutesChips();
+      this.hideFilterEmptyIndicators();
 
       const locNameElem = document.getElementById('query-location-name');
       const locSearchInput = document.getElementById('location-search-input');
@@ -1797,6 +1826,7 @@ class BusMapApp {
     // Render Polylines on Map
     this.renderMapRoutes();
     this.updateVisibleRoutesChips();
+    this.updateFilterEmptyIndicators();
   }
 
   applyCatchmentAutoColoring(routes) {
@@ -1884,7 +1914,24 @@ class BusMapApp {
     list.innerHTML = '';
 
     if (routes.length === 0) {
-      list.innerHTML = `<div style="padding:16px; text-align:center; color:#94a3b8; font-size:13px;">No bus routes found within ${this.currentRadius}m radius. Try expanding the catchment radius above.</div>`;
+      if (this.activeRoutes.length > 0) {
+        list.innerHTML = `
+          <div class="sidebar-filter-hidden-box">
+            <div style="font-size:24px; margin-bottom:8px;">🚦</div>
+            <div style="font-weight:600; color:#f1f5f9; margin-bottom:4px; font-size:14px;">All ${this.activeRoutes.length} routes hidden by active filters</div>
+            <div style="color:#94a3b8; margin-bottom:12px; font-size:12px;">Transit modes are currently deselected in the filter.</div>
+            <button id="reset-filters-btn" class="reset-filters-btn" type="button">Reset Filters</button>
+          </div>
+        `;
+        const resetBtn = document.getElementById('reset-filters-btn');
+        if (resetBtn) {
+          resetBtn.addEventListener('click', () => {
+            this.resetModalFilters();
+          });
+        }
+      } else {
+        list.innerHTML = `<div style="padding:16px; text-align:center; color:#94a3b8; font-size:13px;">No bus routes found within ${this.currentRadius}m radius. Try expanding the catchment radius above.</div>`;
+      }
       return;
     }
 
@@ -2183,6 +2230,91 @@ class BusMapApp {
     this.renderSidebarRoutes(this.activeRoutes.filter(r => this.isRouteCategoryAllowed(r.category)));
     this.updateVisibleRoutesChips();
     this.updateStatusBadges();
+    this.updateFilterEmptyIndicators();
+  }
+
+  // Issue #5: Filter Empty Indicators & Action Handlers
+  updateFilterEmptyIndicators() {
+    const pill = document.getElementById('filter-empty-pill');
+    if (!pill) return;
+    const filteredRoutes = this.activeRoutes.filter(r => this.isRouteCategoryAllowed(r.category));
+    if (this.activeRoutes.length > 0 && filteredRoutes.length === 0) {
+      const textSpan = document.getElementById('filter-empty-text');
+      if (textSpan) {
+        textSpan.textContent = `All ${this.activeRoutes.length} routes hidden by active filters`;
+      }
+      pill.classList.remove('hidden');
+    } else {
+      pill.classList.add('hidden');
+    }
+  }
+
+  hideFilterEmptyIndicators() {
+    const pill = document.getElementById('filter-empty-pill');
+    if (pill) {
+      pill.classList.add('hidden');
+    }
+  }
+
+  resetModalFilters() {
+    this.activeFilters = {};
+    const group = document.getElementById('modal-filters-group');
+    if (group) {
+      const inputs = group.querySelectorAll('input[type="checkbox"]');
+      inputs.forEach(input => {
+        input.checked = true;
+      });
+    }
+    if (this.renderedCategoryKeys) {
+      this.renderedCategoryKeys.forEach(k => {
+        this.activeFilters[k] = true;
+      });
+    }
+    this.syncFilterLayers();
+    this.updateUrlCoordinates();
+    this.hideFilterEmptyIndicators();
+    this.triggerFilterResetSuccessAnimation();
+  }
+
+  // Issue #5: Visual feedback animation on modal filter button indicating all routes enabled
+  triggerFilterResetSuccessAnimation() {
+    const toggleBtn = document.getElementById('modal-filter-toggle-btn');
+    const successBadge = document.getElementById('filter-success-badge');
+    const toast = document.getElementById('filter-feedback-toast');
+
+    if (toggleBtn) {
+      toggleBtn.classList.remove('btn-reset-success');
+      void toggleBtn.offsetWidth; // trigger reflow
+      toggleBtn.classList.add('btn-reset-success');
+      if (this._filterResetPulseTimer) clearTimeout(this._filterResetPulseTimer);
+      this._filterResetPulseTimer = setTimeout(() => {
+        toggleBtn.classList.remove('btn-reset-success');
+      }, 1800);
+    }
+
+    if (successBadge) {
+      successBadge.classList.remove('hidden');
+      successBadge.classList.remove('badge-pop-animate');
+      void successBadge.offsetWidth;
+      successBadge.classList.add('badge-pop-animate');
+      if (this._filterBadgeTimer) clearTimeout(this._filterBadgeTimer);
+      this._filterBadgeTimer = setTimeout(() => {
+        successBadge.classList.add('hidden');
+        successBadge.classList.remove('badge-pop-animate');
+      }, 1900);
+    }
+
+    if (toast) {
+      toast.classList.remove('hidden');
+      toast.classList.remove('toast-pop-animate');
+      void toast.offsetWidth;
+      toast.classList.add('toast-pop-animate');
+      if (this._filterToastTimer) clearTimeout(this._filterToastTimer);
+      this._filterToastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+        toast.classList.remove('toast-pop-animate');
+      }, 2200);
+    }
   }
 
   selectRoute(routeId) {
@@ -2974,7 +3106,12 @@ class BusMapApp {
     if (visible.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'visible-chips-empty';
-      empty.textContent = 'No routes in view';
+      const filteredRoutes = this.activeRoutes.filter(r => this.isRouteCategoryAllowed(r.category));
+      if (this.activeRoutes.length > 0 && filteredRoutes.length === 0) {
+        empty.textContent = 'All routes hidden by filters';
+      } else {
+        empty.textContent = 'No routes in view';
+      }
       container.appendChild(empty);
       return;
     }
