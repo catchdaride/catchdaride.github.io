@@ -2112,6 +2112,7 @@ path.leaflet-interactive:active,
 }
 
 .modal-filter-toggle-btn {
+  position: relative;
   background: rgba(15, 23, 42, 0.95);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -3460,6 +3461,77 @@ path.leaflet-interactive:active,
   transform: translateX(-50%) translateY(-10px);
 }
 
+/* Issue #5: Filter Empty State & Floating Pill */
+.filter-empty-pill {
+  position: fixed;
+  top: calc(var(--topbar-height) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4), 0 0 12px rgba(245, 158, 11, 0.25);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 6px 12px 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1002;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.filter-empty-pill.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(-10px);
+}
+
+.filter-empty-action-btn {
+  background: #f59e0b;
+  color: #0f172a;
+  border: none;
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.filter-empty-action-btn:hover {
+  background: #fbbf24;
+  transform: scale(1.04);
+}
+
+.reset-filters-btn {
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.reset-filters-btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.sidebar-filter-hidden-box {
+  padding: 24px 16px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
 /* UX-3: Timeline Catchment Stop Highlight & Nearest Badge */
 .timeline-stop-node.catchment-stop {
   background: rgba(239, 68, 68, 0.12);
@@ -3590,6 +3662,149 @@ path.leaflet-interactive:active,
 
 .filter-active-dot.hidden {
   display: none;
+}
+
+/* Issue #5: Visual feedback on modal filter button when enabling all modes */
+.modal-filter-toggle-btn.btn-reset-success {
+  animation: filterResetPulse 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes filterResetPulse {
+  0% {
+    transform: scale(1);
+    border-color: #10b981;
+    color: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8);
+  }
+  25% {
+    transform: scale(1.18);
+    border-color: #34d399;
+    color: #34d399;
+    background: rgba(6, 78, 59, 0.7);
+    box-shadow: 0 0 22px 6px rgba(16, 185, 129, 0.7), inset 0 0 10px rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    border-color: #10b981;
+    color: #10b981;
+    background: rgba(6, 78, 59, 0.4);
+    box-shadow: 0 0 16px 3px rgba(16, 185, 129, 0.5);
+  }
+  80% {
+    transform: scale(1);
+    border-color: rgba(16, 185, 129, 0.6);
+    color: var(--text-main);
+    box-shadow: 0 0 8px 1px rgba(16, 185, 129, 0.3);
+  }
+  100% {
+    transform: scale(1);
+    border-color: var(--border);
+    color: var(--text-main);
+    background: rgba(15, 23, 42, 0.95);
+    box-shadow: none;
+  }
+}
+
+.filter-success-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  background: #10b981;
+  color: #ffffff;
+  border: 1.5px solid #0f172a;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.9);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.filter-success-badge.hidden {
+  display: none;
+}
+
+.filter-success-badge.badge-pop-animate {
+  animation: filterSuccessBadgePop 1.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes filterSuccessBadgePop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+}
+
+.filter-feedback-toast {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #10b981;
+  color: #34d399;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(16, 185, 129, 0.4);
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-feedback-toast.hidden {
+  display: none;
+}
+
+.filter-feedback-toast.toast-pop-animate {
+  animation: filterToastSlideFade 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes filterToastSlideFade {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-10px) scale(0.92);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) translateX(6px) scale(0.92);
+  }
 }
 
 /* UX-8: Route Hover Tooltips */
