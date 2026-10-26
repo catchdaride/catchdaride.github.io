@@ -281,7 +281,12 @@
               <circle cx="10" cy="18" r="2.2" fill="currentColor"></circle>
             </svg>
             <span id="filter-active-dot" class="filter-active-dot hidden" title="Filters active"></span>
+            <span id="filter-success-badge" class="filter-success-badge hidden" title="All routes enabled">✓</span>
           </button>
+          <div id="filter-feedback-toast" class="filter-feedback-toast hidden" role="status">
+            <span>✓</span>
+            <span>All modes enabled</span>
+          </div>
           
           <div id="modal-filter-dropdown" class="modal-filter-dropdown" role="dialog" aria-label="Filter Transit Modes">
             <div class="modal-filter-dropdown-header">
@@ -350,7 +355,7 @@
                   <span class="about-badge-beta">BETA</span>
                 </div>
                 <div class="about-version-row">
-                  <span class="about-version-badge">Version 0.6.0</span>
+                  <span class="about-version-badge">Version 0.6.1</span>
                   <span class="about-meta-tag">Transit Platform</span>
                 </div>
                 <p class="about-app-desc">Interactive public transit catchment &amp; walking radius explorer</p>
@@ -525,6 +530,13 @@
           <span class="pill-icon">🎯</span>
           <span class="pill-text">Set Catchment Here</span>
         </button>
+
+        <!-- Floating Filter Hidden Indicator (Issue #5) -->
+        <div id="filter-empty-pill" class="filter-empty-pill hidden" role="status">
+          <span class="pill-icon">🚦</span>
+          <span class="filter-empty-text" id="filter-empty-text">Routes hidden by active filters</span>
+          <button id="filter-empty-enable-btn" class="filter-empty-action-btn" type="button">Enable All Modes</button>
+        </div>
 
         <!-- Floating Empty Catchment Card (UX-1) -->
         <div id="empty-catchment-card" class="empty-catchment-card hidden" role="alert">
