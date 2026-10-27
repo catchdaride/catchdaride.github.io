@@ -510,6 +510,184 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// Calculate initial navigation bearing from (lat1, lon1) to (lat2, lon2) in radians (-PI to PI)
+function calculateBearing(lat1, lon1, lat2, lon2) {
+  const rad = Math.PI / 180;
+  const phi1 = lat1 * rad;
+  const phi2 = lat2 * rad;
+  const deltaLambda = (lon2 - lon1) * rad;
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+  return Math.atan2(y, x);
+}
+
+// Find nearest vertex or stop of a route relative to queryPoint
+function findRouteNearestVertex(route, queryPoint, geomData) {
+  if (!queryPoint || typeof queryPoint.lat !== 'number' || typeof queryPoint.lon !== 'number') {
+    return { distMeters: 0, bearing: 0 };
+  }
+  const qLat = queryPoint.lat;
+  const qLon = queryPoint.lon;
+  const cosLat = Math.cos(qLat * (Math.PI / 180));
+
+  let bestDistSq = Infinity;
+  let bestLat = qLat;
+  let bestLon = qLon;
+
+  const checkPoint = (lat, lon) => {
+    if (typeof lat !== 'number' || typeof lon !== 'number') return;
+    const dLat = lat - qLat;
+    const dLon = (lon - qLon) * cosLat;
+    const dSq = dLat * dLat + dLon * dLon;
+    if (dSq < bestDistSq) {
+      bestDistSq = dSq;
+      bestLat = lat;
+      bestLon = lon;
+    }
+  };
+
+  if (geomData) {
+    if (Array.isArray(geomData)) {
+      if (geomData.length > 0 && Array.isArray(geomData[0]) && Array.isArray(geomData[0][0])) {
+        for (const branch of geomData) {
+          for (const pt of branch) checkPoint(pt[1], pt[0]);
+        }
+      } else {
+        for (const pt of geomData) checkPoint(pt[1], pt[0]);
+      }
+    } else if (typeof geomData === 'object') {
+      for (const key of Object.keys(geomData)) {
+        const part = geomData[key];
+        if (part && Array.isArray(part.coordinates)) {
+          if (part.coordinates.length > 0 && Array.isArray(part.coordinates[0]) && Array.isArray(part.coordinates[0][0])) {
+            for (const branch of part.coordinates) {
+              for (const pt of branch) checkPoint(pt[1], pt[0]);
+            }
+          } else {
+            for (const pt of part.coordinates) checkPoint(pt[1], pt[0]);
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback to route stops if no geometry points found
+  if (bestDistSq === Infinity && Array.isArray(route.stops)) {
+    for (const stop of route.stops) {
+      const sLat = typeof stop.lat === 'number' ? stop.lat : (Array.isArray(stop) ? stop[1] : null);
+      const sLon = typeof stop.lon === 'number' ? stop.lon : (typeof stop.lng === 'number' ? stop.lng : (Array.isArray(stop) ? stop[0] : null));
+      if (sLat !== null && sLon !== null) {
+        checkPoint(sLat, sLon);
+      }
+    }
+  }
+
+  if (bestDistSq === Infinity) {
+    return { distMeters: 0, bearing: 0 };
+  }
+
+  const distMeters = haversineMeters(qLat, qLon, bestLat, bestLon);
+  const bearing = calculateBearing(qLat, qLon, bestLat, bestLon);
+  return { distMeters, bearing };
+}
+
+// Compute irregular dendritic wavefront delays (Issue #11)
+function computeRouteWavefrontDelays(routes, queryPoint, geometryCache) {
+  if (!routes || routes.length === 0) return new Map();
+
+  const routeMetrics = [];
+  for (const route of routes) {
+    const geomData = geometryCache ? geometryCache.get(route.id) : null;
+    const { distMeters, bearing } = findRouteNearestVertex(route, queryPoint, geomData);
+    const angleJitter = Math.sin(bearing * 3) * 60 + Math.cos(bearing * 2) * 40;
+    const routeIdStr = String(route.id || '');
+    const hashJitter = ((routeIdStr.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 70) - 35);
+    const rawDelay = Math.max(0, (distMeters * 0.45) + angleJitter + hashJitter);
+    routeMetrics.push({ routeId: route.id, rawDelay, distMeters, bearing });
+  }
+
+  const delayMap = new Map();
+  if (routeMetrics.length <= 1) {
+    if (routeMetrics.length === 1) {
+      delayMap.set(routeMetrics[0].routeId, 0);
+    }
+    return delayMap;
+  }
+
+  let minRaw = Infinity;
+  let maxRaw = -Infinity;
+  for (const m of routeMetrics) {
+    if (m.rawDelay < minRaw) minRaw = m.rawDelay;
+    if (m.rawDelay > maxRaw) maxRaw = m.rawDelay;
+  }
+
+  const cascadeSpan = maxRaw - minRaw;
+  // Scale delays so the entire cascade finishes within 400ms – 650ms total
+  const targetDuration = cascadeSpan > 0 ? Math.min(650, Math.max(400, cascadeSpan)) : 0;
+
+  for (const m of routeMetrics) {
+    const delay = cascadeSpan > 0
+      ? Math.round(((m.rawDelay - minRaw) / cascadeSpan) * targetDuration)
+      : 0;
+    delayMap.set(m.routeId, delay);
+  }
+  return delayMap;
+}
+
+// Recursively retrieve all SVG <path> elements from Leaflet polyline / featureGroup layer
+function getLayerSvgPaths(layer) {
+  const paths = [];
+  if (!layer) return paths;
+  if (layer._path) {
+    paths.push(layer._path);
+  }
+  if (typeof layer.eachLayer === 'function') {
+    layer.eachLayer(child => {
+      paths.push(...getLayerSvgPaths(child));
+    });
+  }
+  return paths;
+}
+
+// Precompute harmonic directional offsets for locked 60 FPS wavefront animation (Issue #11)
+function precomputeWavefrontOffsets(numVertices) {
+  const offsets = [];
+  for (let i = 0; i < numVertices; i++) {
+    const theta = (i / numVertices) * 2 * Math.PI;
+    const harmonic = 1 + 0.25 * Math.sin(theta * 3) + 0.15 * Math.cos(theta * 5) + 0.06 * Math.sin(theta * 7);
+    offsets.push({
+      dx: harmonic * Math.cos(theta),
+      dy: harmonic * Math.sin(theta)
+    });
+  }
+  return offsets;
+}
+
+// Adaptive LOD based on visible route density
+function getAdaptiveLODVertices(routeCount) {
+  if (routeCount >= 35) return 18;
+  if (routeCount >= 18) return 24;
+  return 32;
+}
+
+// Build irregular animated polygon points for organic dendritic wavefront (Issue #11)
+function buildWavefrontPolygonPoints(center, radius, offsetsOrVertices = 32) {
+  if (!center || typeof center.x !== 'number' || typeof center.y !== 'number') return '';
+  const offsets = Array.isArray(offsetsOrVertices)
+    ? offsetsOrVertices
+    : precomputeWavefrontOffsets(typeof offsetsOrVertices === 'number' ? offsetsOrVertices : 32);
+
+  const pts = [];
+  const len = offsets.length;
+  for (let i = 0; i < len; i++) {
+    const u = offsets[i];
+    const x = Number((center.x + radius * u.dx).toFixed(1));
+    const y = Number((center.y + radius * u.dy).toFixed(1));
+    pts.push(`${x},${y}`);
+  }
+  return pts.join(' ');
+}
+
 // Client-side Stop Corridor Spatial Safeguard (75m threshold)
 function filterStopsWithinCorridor(stops, polylineCoords, maxDistMeters = 75.0) {
   if (!stops || !polylineCoords) return [];
@@ -544,15 +722,114 @@ function pointToSegmentMeters(px, py, x1, y1, x2, y2) {
   return haversineMeters(px, py, projX, projY);
 }
 
+// Lightweight Native Geohash Encoding & Decoding (Zero Dependencies, Base32)
+const GEOHASH_BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+
+function encodeGeohash(lat, lon, precision = 7) {
+  if (typeof lat !== 'number' || typeof lon !== 'number' || isNaN(lat) || isNaN(lon)) {
+    return null;
+  }
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    return null;
+  }
+  let minLat = -90.0, maxLat = 90.0;
+  let minLon = -180.0, maxLon = 180.0;
+  let geohash = '';
+  let isEven = true;
+  let bit = 0;
+  let ch = 0;
+
+  while (geohash.length < precision) {
+    if (isEven) {
+      const mid = (minLon + maxLon) / 2;
+      if (lon >= mid) {
+        ch |= (1 << (4 - bit));
+        minLon = mid;
+      } else {
+        maxLon = mid;
+      }
+    } else {
+      const mid = (minLat + maxLat) / 2;
+      if (lat >= mid) {
+        ch |= (1 << (4 - bit));
+        minLat = mid;
+      } else {
+        maxLat = mid;
+      }
+    }
+    isEven = !isEven;
+
+    if (bit < 4) {
+      bit++;
+    } else {
+      geohash += GEOHASH_BASE32[ch];
+      bit = 0;
+      ch = 0;
+    }
+  }
+
+  return geohash;
+}
+
+function decodeGeohash(hash) {
+  if (!hash || typeof hash !== 'string') return null;
+  const cleanHash = hash.trim().toLowerCase();
+  if (cleanHash.length === 0) return null;
+
+  let minLat = -90.0, maxLat = 90.0;
+  let minLon = -180.0, maxLon = 180.0;
+  let isEven = true;
+
+  for (let i = 0; i < cleanHash.length; i++) {
+    const char = cleanHash[i];
+    const cd = GEOHASH_BASE32.indexOf(char);
+    if (cd === -1) return null;
+
+    for (let mask = 16; mask > 0; mask >>= 1) {
+      if (isEven) {
+        const mid = (minLon + maxLon) / 2;
+        if (cd & mask) {
+          minLon = mid;
+        } else {
+          maxLon = mid;
+        }
+      } else {
+        const mid = (minLat + maxLat) / 2;
+        if (cd & mask) {
+          minLat = mid;
+        } else {
+          maxLat = mid;
+        }
+      }
+      isEven = !isEven;
+    }
+  }
+
+  return {
+    lat: (minLat + maxLat) / 2,
+    lon: (minLon + maxLon) / 2,
+    latError: (maxLat - minLat) / 2,
+    lonError: (maxLon - minLon) / 2
+  };
+}
+
+if (typeof window !== 'undefined') {
+  window.encodeGeohash = encodeGeohash;
+  window.decodeGeohash = decodeGeohash;
+  window.GEOHASH_BASE32 = GEOHASH_BASE32;
+}
+
 // Main Application State
 class BusMapApp {
   constructor() {
+    this.defaultRadius = 400;
+    this.currentRadius = 400; // Default: 400m
     this.parseUrlFilterParameters();
     const initialLoc = this.resolveInitialLocation();
     this.queryPoint = { lat: initialLoc.lat, lon: initialLoc.lon };
     this.currentAgencyId = initialLoc.agencyId;
     this.lastSelectedLocationName = initialLoc.name;
-    this.currentRadius = 400; // Default: 400m
+    this.currentRadius = this.currentRadius || 400;
 
     // Initial modality filters (None in URL defaults to select all)
     const ALL_KNOWN_MODES = ['metro', 'train', 'tram', 'ferry', 'smartbus', 'express', 'local', 'minibus'];
@@ -581,6 +858,8 @@ class BusMapApp {
     this.hitTargetLayers = new Map();
     this.stopPinLayers = [];
     this.stopPinsMap = new Map();
+    this.routeAnimationTimers = [];
+    this.routeAnimationFrameId = null;
     this.currentSearchSuggestions = [];
     this.selectedSuggestionIndex = -1;
     this.agencyCategoriesMap = new Map();
@@ -599,15 +878,35 @@ class BusMapApp {
     this.initGeolocationDefault();
   }
 
+  encodeGeohash(lat, lon, precision = 7) {
+    return encodeGeohash(lat, lon, precision);
+  }
+
+  decodeGeohash(hash) {
+    return decodeGeohash(hash);
+  }
+
   parseUrlFilterParameters() {
     try {
-      if (typeof window === 'undefined' || !window.location || !window.location.search) {
+      if (typeof window === 'undefined' || !window.location) {
         this.hasExplicitModesParam = false;
         this.specifiedModes = null;
         return;
       }
-      const urlParams = new URLSearchParams(window.location.search);
-      const rawModes = urlParams.get('modes') || urlParams.get('mode');
+      let rawModes = null;
+      if (window.location.search) {
+        const urlParams = new URLSearchParams(window.location.search);
+        rawModes = urlParams.get('modes') || urlParams.get('mode');
+      }
+
+      // Check compact hash geohash segments for modal filter overrides (/#geohash/radius/modes or /#geohash//modes)
+      if ((rawModes === null || rawModes === undefined || rawModes.trim() === '') && window.location.hash) {
+        const geohashMatch = window.location.hash.match(/^#?([0-9bcdefghjkmnpqrstuvwxyz]{7})(?:\/(\d*))?(?:\/([a-zA-Z0-9_,*]+))?\/?$/i);
+        if (geohashMatch && geohashMatch[3]) {
+          rawModes = geohashMatch[3];
+        }
+      }
+
       if (rawModes === null || rawModes === undefined || rawModes.trim() === '') {
         // "with none defaulted to select all" - omitted or empty parameter defaults to select all
         this.hasExplicitModesParam = false;
@@ -636,18 +935,36 @@ class BusMapApp {
   resolveInitialLocation() {
     // Check URL parameters for explicit deep-linked coordinates or hub/city targets (e.g. from SEO landing pages)
     try {
-      const urlParams = new URLSearchParams(window.location.search);
+      const urlParams = (typeof window !== 'undefined' && window.location && window.location.search)
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams();
       let paramLat = parseFloat(urlParams.get('lat'));
       let paramLon = parseFloat(urlParams.get('lon'));
       const paramName = urlParams.get('name') || urlParams.get('hub') || urlParams.get('location');
-      const paramRadius = parseInt(urlParams.get('radius'), 10);
+      let paramRadius = parseInt(urlParams.get('radius'), 10);
 
-      // Support hash coordinates (#lat,lon) as fallback
-      if ((isNaN(paramLat) || isNaN(paramLon)) && typeof window !== 'undefined' && window.location.hash) {
-        const hashMatch = window.location.hash.match(/^#?(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-        if (hashMatch) {
-          paramLat = parseFloat(hashMatch[1]);
-          paramLon = parseFloat(hashMatch[2]);
+      // Support compact geohash hash (#<geohash>) and legacy hash coordinates (#lat,lon) as fallback
+      if (typeof window !== 'undefined' && window.location && window.location.hash) {
+        const hash = window.location.hash;
+        const geohashMatch = hash.match(/^#?([0-9bcdefghjkmnpqrstuvwxyz]{7})(?:\/(\d*))?(?:\/([a-zA-Z0-9_,*]+))?\/?$/i);
+        if (geohashMatch) {
+          const decoded = decodeGeohash(geohashMatch[1]);
+          if (decoded && !isNaN(decoded.lat) && !isNaN(decoded.lon)) {
+            paramLat = decoded.lat;
+            paramLon = decoded.lon;
+            if (geohashMatch[2] && geohashMatch[2].length > 0) {
+              const hashRadius = parseInt(geohashMatch[2], 10);
+              if (!isNaN(hashRadius) && hashRadius > 0) {
+                paramRadius = hashRadius;
+              }
+            }
+          }
+        } else if (isNaN(paramLat) || isNaN(paramLon)) {
+          const hashMatch = hash.match(/^#?(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+          if (hashMatch) {
+            paramLat = parseFloat(hashMatch[1]);
+            paramLon = parseFloat(hashMatch[2]);
+          }
         }
       }
 
@@ -1002,7 +1319,8 @@ class BusMapApp {
     mapContainer.addEventListener('mouseup', endLongPress);
 
     // Leaflet dragstart fallback
-    this.map.on('dragstart movestart', () => {
+    this.map.on('dragstart movestart zoomstart', () => {
+      this.clearRouteLoadingAnimations();
       endLongPress();
     });
 
@@ -1195,6 +1513,7 @@ class BusMapApp {
     // Radius Selector Buttons
     const radiusBtns = document.querySelectorAll('.radius-btn');
     radiusBtns.forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.radius, 10) === this.currentRadius);
       btn.addEventListener('click', (e) => {
         radiusBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -1607,22 +1926,74 @@ class BusMapApp {
 
   buildShareUrl() {
     try {
-      if (this.queryPoint) {
-        this.updateUrlCoordinates(this.queryPoint.lat, this.queryPoint.lon, this.currentRadius);
+      const origin = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : '';
+      let pathname = (typeof window !== 'undefined' && window.location && window.location.pathname) ? window.location.pathname : '/';
+
+      // Path normalization: if pathname ends with /index.html, trim it to / (preserve hub subpaths like /melbourne/flinders-street/)
+      if (pathname.endsWith('/index.html')) {
+        pathname = pathname.slice(0, -10) || '/';
+      } else if (pathname === 'index.html') {
+        pathname = '/';
       }
-      const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : '';
-      const pathname = (typeof window !== 'undefined' && window.location.pathname) ? window.location.pathname : '/';
-      const search = (typeof window !== 'undefined' && window.location.search) ? window.location.search : '';
+
+      // Eliminate coordinate and mode redundancy from search query parameters
+      let search = '';
+      if (typeof window !== 'undefined' && window.location && window.location.search) {
+        const searchParams = new URLSearchParams(window.location.search);
+        searchParams.delete('lat');
+        searchParams.delete('lon');
+        searchParams.delete('radius');
+        searchParams.delete('modes');
+        searchParams.delete('mode');
+        const remaining = searchParams.toString();
+        search = remaining ? `?${remaining}` : '';
+      }
 
       let hash = '';
       if (this.queryPoint && typeof this.queryPoint.lat === 'number' && typeof this.queryPoint.lon === 'number') {
-        hash = `#${this.queryPoint.lat.toFixed(6)},${this.queryPoint.lon.toFixed(6)}`;
-      } else if (typeof window !== 'undefined' && window.location.hash) {
+        const geohash = encodeGeohash(this.queryPoint.lat, this.queryPoint.lon, 7);
+        if (geohash) {
+          // Radius handling: If currentRadius is non-default (standard default is 400), append /${radius}. If default, omit it.
+          const defaultRadius = this.defaultRadius || 400;
+          const currentRadius = this.currentRadius || defaultRadius;
+          const radiusSegment = (currentRadius !== defaultRadius) ? String(currentRadius) : '';
+
+          // Mode filters handling ("none defaulted to select all")
+          const availableKeys = (this.renderedCategoryKeys && this.renderedCategoryKeys.size > 0)
+            ? Array.from(this.renderedCategoryKeys)
+            : ['train', 'tram', 'smartbus', 'express', 'local'];
+
+          const selectedKeys = availableKeys.filter(k => this.activeFilters && this.activeFilters[k] !== false);
+
+          let modesSegment = '';
+          if (availableKeys.length > 0 && selectedKeys.length === availableKeys.length) {
+            // All available modes selected -> omit modes entirely
+            modesSegment = '';
+          } else if (availableKeys.length > 0 && selectedKeys.length === 0) {
+            // No modes selected -> append /none
+            modesSegment = 'none';
+          } else if (availableKeys.length > 0) {
+            // Subset selected -> append comma-separated list
+            modesSegment = selectedKeys.join(',');
+          }
+
+          if (modesSegment) {
+            hash = `#${geohash}/${radiusSegment}/${modesSegment}`;
+          } else if (radiusSegment) {
+            hash = `#${geohash}/${radiusSegment}`;
+          } else {
+            hash = `#${geohash}`;
+          }
+        }
+      }
+
+      if (!hash && typeof window !== 'undefined' && window.location && window.location.hash) {
         hash = window.location.hash;
       }
+
       return `${origin}${pathname}${search}${hash}`;
     } catch (e) {
-      return (typeof window !== 'undefined') ? window.location.href : '';
+      return (typeof window !== 'undefined' && window.location) ? window.location.href : '';
     }
   }
 
@@ -1769,6 +2140,7 @@ class BusMapApp {
   }
 
   setQueryLocation(lat, lon) {
+    this.clearRouteLoadingAnimations();
     this.closeDrawer();
     this.closeRouteBottomBox();
     this.clearStopPins();
@@ -1964,8 +2336,8 @@ class BusMapApp {
     // Decoupled Geometry Fetching (Rule 2)
     await this.ensureGeometriesLoaded(data.matchedRouteIds);
 
-    // Render Polylines on Map
-    this.renderMapRoutes();
+    // Render Polylines on Map with organic dendritic bloom animation (Issue #11)
+    this.renderMapRoutes({ animate: true });
     this.updateVisibleRoutesChips();
     this.updateFilterEmptyIndicators();
   }
@@ -2125,7 +2497,168 @@ class BusMapApp {
     this.stopPinsMap.clear();
   }
 
-  renderMapRoutes() {
+  // Issue #11: Clear all pending route wavefront animation frames, timers, and reset path clip-paths & styles
+  clearRouteLoadingAnimations() {
+    if (this.routeAnimationFrameId) {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(this.routeAnimationFrameId);
+      } else {
+        clearTimeout(this.routeAnimationFrameId);
+      }
+      this.routeAnimationFrameId = null;
+    }
+    if (this.routeAnimationTimers && this.routeAnimationTimers.length > 0) {
+      this.routeAnimationTimers.forEach(id => clearTimeout(id));
+      this.routeAnimationTimers = [];
+    }
+    if (this.map && typeof this.map.getPanes === 'function') {
+      try {
+        const overlayPane = this.map.getPanes().overlayPane;
+        const svg = overlayPane ? overlayPane.querySelector('svg') : null;
+        if (svg) {
+          const wrapper = svg.querySelector('#route-bloom-wrapper');
+          if (wrapper) {
+            const parent = wrapper.parentNode;
+            while (wrapper.firstChild) {
+              parent.insertBefore(wrapper.firstChild, wrapper);
+            }
+            wrapper.remove();
+          }
+          const defs = svg.querySelector('#route-bloom-defs');
+          if (defs) defs.remove();
+        }
+      } catch (_) {}
+    }
+    if (this.routeLayers) {
+      this.routeLayers.forEach(layer => {
+        const paths = getLayerSvgPaths(layer);
+        paths.forEach(p => {
+          p.removeAttribute('clip-path');
+          p.classList.remove('route-path-hidden', 'route-path-enter');
+          p.style.opacity = '';
+          p.style.transition = '';
+        });
+      });
+    }
+    if (this.hitTargetLayers) {
+      this.hitTargetLayers.forEach(layer => {
+        const paths = getLayerSvgPaths(layer);
+        paths.forEach(p => {
+          p.removeAttribute('clip-path');
+        });
+      });
+    }
+  }
+
+  // Issue #11: Irregular Spatial Wavefront Bloom (Progressive radial expansion from query center)
+  triggerRouteBloomAnimation(visibleRoutes) {
+    this.clearRouteLoadingAnimations();
+
+    if (!this.map || !this.queryPoint || !visibleRoutes || visibleRoutes.length === 0) return;
+    const overlayPane = (typeof this.map.getPanes === 'function') ? this.map.getPanes().overlayPane : null;
+    if (!overlayPane) return;
+    const svg = overlayPane.querySelector('svg');
+    if (!svg) return;
+
+    // 1. Create or get SVG defs and clipPath
+    let defs = svg.querySelector('#route-bloom-defs');
+    if (!defs) {
+      defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+      defs.id = 'route-bloom-defs';
+      svg.insertBefore(defs, svg.firstChild);
+    }
+
+    let clip = defs.querySelector('#route-wavefront-clip');
+    if (!clip) {
+      clip = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+      clip.id = 'route-wavefront-clip';
+      clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+      defs.appendChild(clip);
+    }
+
+    let polygon = clip.querySelector('#route-wavefront-poly');
+    if (!polygon) {
+      polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      polygon.id = 'route-wavefront-poly';
+      clip.appendChild(polygon);
+    }
+
+    // 2. Wrap visible route paths in #route-bloom-wrapper for single-pass GPU compositing
+    // Invisible interaction hit-targets (hitTargetLayers) are strictly excluded from clipping
+    const rootG = svg.querySelector('g') || svg;
+    let wrapper = svg.querySelector('#route-bloom-wrapper');
+    if (!wrapper) {
+      wrapper = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      wrapper.id = 'route-bloom-wrapper';
+      rootG.appendChild(wrapper);
+    }
+    wrapper.setAttribute('clip-path', 'url(#route-wavefront-clip)');
+
+    let pathCount = 0;
+    visibleRoutes.forEach(route => {
+      const layer = this.routeLayers.get(route.id);
+      if (layer) {
+        const paths = getLayerSvgPaths(layer);
+        paths.forEach(p => {
+          wrapper.appendChild(p);
+          pathCount++;
+        });
+      }
+    });
+
+    if (pathCount === 0) {
+      this.clearRouteLoadingAnimations();
+      return;
+    }
+
+    // 3. Adaptive LOD based on route density & pre-computed harmonic directional offsets
+    const numVertices = getAdaptiveLODVertices(visibleRoutes.length);
+    const offsets = precomputeWavefrontOffsets(numVertices);
+
+    // 4. Setup expanding wavefront parameters
+    const center = this.map.latLngToLayerPoint([this.queryPoint.lat, this.queryPoint.lon]);
+    const size = (typeof this.map.getSize === 'function') ? this.map.getSize() : { x: 1200, y: 800 };
+    // Maximum distance from center to any viewport corner
+    const maxDistToCorner = Math.sqrt(
+      Math.max(center.x, size.x - center.x) ** 2 +
+      Math.max(center.y, size.y - center.y) ** 2
+    );
+    const targetMaxRadius = Math.max(750, maxDistToCorner * 1.05);
+    const duration = 1400; // ms
+    const startTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+    // Initial 0px polygon (routes start hidden at center point)
+    polygon.setAttribute('points', buildWavefrontPolygonPoints(center, 0, offsets));
+
+    const reqAnim = (typeof requestAnimationFrame === 'function')
+      ? requestAnimationFrame
+      : (cb) => setTimeout(() => cb((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()), 16);
+
+    const step = (now) => {
+      const currentTime = now || ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(1.0, elapsed / duration);
+      // Smooth sine ease-in-out: starts gently from center, blooms steadily, and settles smoothly
+      const ease = 0.5 * (1 - Math.cos(Math.PI * progress));
+      const currentRadius = targetMaxRadius * ease;
+
+      polygon.setAttribute('points', buildWavefrontPolygonPoints(center, currentRadius, offsets));
+
+      if (progress < 1.0) {
+        this.routeAnimationFrameId = reqAnim(step);
+      } else {
+        // Animation finished: clean up clip-path and defs completely so Leaflet layers return to normal
+        this.clearRouteLoadingAnimations();
+      }
+    };
+
+    this.routeAnimationFrameId = reqAnim(step);
+  }
+
+  renderMapRoutes(options = {}) {
+    const { animate = false } = options;
+    this.clearRouteLoadingAnimations();
+
     // Clear old layers
     this.routeLayers.forEach(l => this.map.removeLayer(l));
     this.hitTargetLayers.forEach(l => this.map.removeLayer(l));
@@ -2138,6 +2671,12 @@ class BusMapApp {
 
     const visibleRoutes = this.activeRoutes.filter(r => this.isRouteCategoryAllowed(r.category));
     const totalCount = visibleRoutes.length;
+
+    const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const shouldAnimate = Boolean(animate && !prefersReducedMotion && this.queryPoint && totalCount > 1 && !this.selectedRouteId);
+    const delayMap = shouldAnimate
+      ? computeRouteWavefrontDelays(visibleRoutes, this.queryPoint, this.geometryCache)
+      : new Map();
 
     const onRouteLineClick = (e) => {
       if (e && e.originalEvent) {
@@ -2271,6 +2810,11 @@ class BusMapApp {
       }
     });
 
+    // Animated Effect when loading routes (Issue #11 - Organic Dendritic Wavefront Bloom)
+    if (shouldAnimate) {
+      this.triggerRouteBloomAnimation(visibleRoutes);
+    }
+
     // Render stops based on selection state
     if (this.selectedRouteId) {
       const selectedRoute = this.activeRoutes.find(r => r.id === this.selectedRouteId);
@@ -2355,6 +2899,7 @@ class BusMapApp {
   }
 
   syncFilterLayers() {
+    this.clearRouteLoadingAnimations();
     if (this.selectedRouteId) {
       const selectedRoute = this.activeRoutes.find(r => r.id === this.selectedRouteId);
       if (selectedRoute && !this.isRouteCategoryAllowed(selectedRoute.category)) {
@@ -2367,7 +2912,7 @@ class BusMapApp {
     } else {
       this.renderCatchmentStops();
     }
-    this.renderMapRoutes();
+    this.renderMapRoutes({ animate: false });
     this.renderSidebarRoutes(this.activeRoutes.filter(r => this.isRouteCategoryAllowed(r.category)));
     this.updateVisibleRoutesChips();
     this.updateStatusBadges();
@@ -2459,6 +3004,7 @@ class BusMapApp {
   }
 
   selectRoute(routeId) {
+    this.clearRouteLoadingAnimations();
     if (this.selectedRouteId === routeId) {
       const route = this.activeRoutes.find(r => r.id === routeId);
       if (route) this.showRouteBottomBox(route);
@@ -3080,6 +3626,7 @@ class BusMapApp {
   }
 
   handleMapClickForCorridors(e) {
+    this.clearRouteLoadingAnimations();
     if (!e || !e.latlng) return;
     const clickLatLng = e.latlng;
     const clickPoint = this.map.latLngToLayerPoint(clickLatLng);
@@ -3945,3 +4492,27 @@ class BusMapApp {
 window.addEventListener('DOMContentLoaded', () => {
   window.busMapApp = new BusMapApp();
 });
+
+// Expose animation helpers for testability
+if (typeof window !== 'undefined') {
+  window.calculateBearing = calculateBearing;
+  window.findRouteNearestVertex = findRouteNearestVertex;
+  window.computeRouteWavefrontDelays = computeRouteWavefrontDelays;
+  window.getLayerSvgPaths = getLayerSvgPaths;
+  window.buildWavefrontPolygonPoints = buildWavefrontPolygonPoints;
+  window.precomputeWavefrontOffsets = precomputeWavefrontOffsets;
+  window.getAdaptiveLODVertices = getAdaptiveLODVertices;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    calculateBearing,
+    findRouteNearestVertex,
+    computeRouteWavefrontDelays,
+    getLayerSvgPaths,
+    buildWavefrontPolygonPoints,
+    precomputeWavefrontOffsets,
+    getAdaptiveLODVertices,
+    haversineMeters
+  };
+}
