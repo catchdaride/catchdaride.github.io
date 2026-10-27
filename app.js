@@ -2673,7 +2673,7 @@ class BusMapApp {
     const totalCount = visibleRoutes.length;
 
     const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const shouldAnimate = Boolean(animate && !prefersReducedMotion && this.queryPoint && totalCount > 1 && !this.selectedRouteId);
+    const shouldAnimate = Boolean(animate && !prefersReducedMotion && this.queryPoint && totalCount >= 1 && !this.selectedRouteId);
     const delayMap = shouldAnimate
       ? computeRouteWavefrontDelays(visibleRoutes, this.queryPoint, this.geometryCache)
       : new Map();
