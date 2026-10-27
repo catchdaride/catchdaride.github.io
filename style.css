@@ -4301,4 +4301,27 @@ path.leaflet-interactive:active,
   }
 }
 
+/* ==========================================================================
+   Issue #11: Animated Route Loading Effect (Organic Dendritic Bloom)
+   ========================================================================== */
+
+path.route-path-hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+path.route-path-enter {
+  opacity: 1 !important;
+  transition: opacity 0.38s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  path.route-path-hidden,
+  path.route-path-enter {
+    opacity: 1 !important;
+    transition: none !important;
+  }
+}
+
+
 
