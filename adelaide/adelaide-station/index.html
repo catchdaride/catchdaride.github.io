@@ -161,10 +161,17 @@
         <div id="location-suggestions-dropdown" class="location-suggestions-dropdown" role="listbox" aria-label="Location suggestions"></div>
       </div>
 
-      <!-- Top Bar Actions (GPS Locate & Share) -->
+      <!-- Top Bar Actions (GPS Locate, Saved Places & Share) -->
       <div class="top-bar-actions">
         <button id="locate-me-btn" class="icon-btn" aria-label="Use GPS My Location" title="Find My Location">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><circle cx="12" cy="12" r="3"></circle></svg>
+        </button>
+        <button id="saved-locations-btn" class="icon-btn saved-locations-btn" aria-label="Saved Places (Local)" title="Saved Places (Local)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+            <polygon points="12 6.5 13.5 9.5 17 10 14.5 12.5 15 16 12 14.2 9 16 9.5 12.5 7 10 10.5 9.5 12 6.5" fill="currentColor"></polygon>
+          </svg>
+          <span id="saved-locations-badge" class="saved-locations-badge hidden" title="Saved Locations Count">0</span>
         </button>
         <button id="share-location-btn" class="icon-btn" aria-label="Share this location" title="Share this location">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -364,7 +371,7 @@
                   <span class="about-badge-beta">BETA</span>
                 </div>
                 <div class="about-version-row">
-                  <span class="about-version-badge">Version 0.6.4</span>
+                  <span class="about-version-badge">Version 0.6.5</span>
                 </div>
                 <p class="about-app-desc">Interactive public transit catchment &amp; walking radius explorer</p>
               </div>
@@ -711,6 +718,86 @@
         <p class="unsupported-modal-hint">Catch Da Ride currently covers 15 regions across 4 countries. Tap any city below to explore its live catchment:</p>
         <div class="unsupported-regions-container" id="unsupported-regions-container">
           <!-- Dynamically populated from backend or fallback -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Saved Locations Modal Backdrop (Issue #8) -->
+    <div class="saved-locations-backdrop hidden" id="saved-locations-backdrop"></div>
+
+    <!-- Floating Saved Locations Modal / Drawer (Issue #8) -->
+    <div id="saved-locations-modal" class="saved-locations-modal hidden" role="dialog" aria-modal="true" aria-labelledby="saved-modal-title">
+      <div class="saved-modal-header">
+        <div class="saved-modal-title-row">
+          <span class="saved-modal-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+              <polygon points="12 6.5 13.5 9.5 17 10 14.5 12.5 15 16 12 14.2 9 16 9.5 12.5 7 10 10.5 9.5 12 6.5" fill="#ef4444"></polygon>
+            </svg>
+          </span>
+          <strong id="saved-modal-title" class="saved-modal-title">Saved Locations</strong>
+          <span id="saved-modal-count-badge" class="saved-modal-count-badge">0 / 5</span>
+        </div>
+        <button id="close-saved-modal-btn" class="close-btn saved-modal-close" aria-label="Close Saved Locations Dialog" title="Close (Esc)">&times;</button>
+      </div>
+
+      <!-- Local Only Privacy Banner -->
+      <div class="saved-privacy-banner" role="note">
+        <span class="privacy-lock-icon">🔒</span>
+        <div class="privacy-text">
+          <strong>Stored Locally:</strong> Saved places are kept strictly in this browser on your device and are never sent to any server.
+        </div>
+      </div>
+
+      <!-- Saved Locations List Container (My Places at top) -->
+      <div class="saved-locations-list-section">
+        <div class="saved-list-header">
+          <span class="saved-list-title">My Places</span>
+          <span class="saved-list-sub" id="saved-list-sub">Max 5 locations</span>
+        </div>
+
+        <div id="saved-locations-list" class="saved-locations-list" role="list">
+          <!-- Dynamically populated cards -->
+        </div>
+
+        <div id="saved-locations-empty" class="saved-locations-empty hidden">
+          <span class="empty-icon">📍</span>
+          <p class="empty-title">No saved locations yet</p>
+          <p class="empty-desc">Move the map pin to any spot you like and tap <strong>"Save Current Pin"</strong> to save up to 5 favorite locations locally.</p>
+        </div>
+      </div>
+
+      <!-- Save Current Pin Form -->
+      <div class="save-current-section" id="save-current-section">
+        <div class="save-current-header">
+          <span class="save-current-pin-icon">📍</span>
+          <span class="save-current-title">Current Pin</span>
+        </div>
+        <div class="save-current-location-text" id="saved-current-pin-name">Current Pin</div>
+        
+        <div class="save-current-form">
+          <div class="save-input-group">
+            <input type="text" id="saved-location-label-input" class="saved-location-label-input" placeholder="Custom label (e.g. Home, Work, Gym)" maxlength="40" aria-label="Custom label for saved location">
+          </div>
+          
+          <div class="saved-quick-tags" id="saved-quick-tags" aria-label="Quick label tags">
+            <button type="button" class="quick-tag-btn" data-tag="Home 🏠">🏠 Home</button>
+            <button type="button" class="quick-tag-btn" data-tag="Work 💼">💼 Work</button>
+            <button type="button" class="quick-tag-btn" data-tag="Favorite ⭐">⭐ Fav</button>
+            <button type="button" class="quick-tag-btn" data-tag="Uni 🎓">🎓 Uni</button>
+            <button type="button" class="quick-tag-btn" data-tag="Gym 🏋️">🏋️ Gym</button>
+          </div>
+
+          <button type="button" id="save-current-pin-btn" class="save-current-pin-btn">
+            <span class="save-btn-icon">➕</span>
+            <span class="save-btn-text" id="save-btn-text">Save Current Pin</span>
+          </button>
+        </div>
+
+        <!-- Limit warning when 5/5 reached -->
+        <div id="saved-limit-warning" class="saved-limit-warning hidden" role="alert">
+          <span>⚠️</span>
+          <span>Maximum 5 locations reached. Delete an existing saved place below to add a new one.</span>
         </div>
       </div>
     </div>
