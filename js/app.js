@@ -872,6 +872,7 @@ class BusMapApp {
 
     this.initMap();
     this.initEventListeners();
+    this.initSavedLocations();
     this.initResizeObserver();
     this.updateStatusBadges();
     this.loadCatchment();
@@ -1184,6 +1185,34 @@ class BusMapApp {
       icon: redPinIcon
     }).addTo(this.map);
 
+    // Companion Jumping Save-Location Pin beside Query Point (Pure Pin Shape)
+    const starredPinSvg = `
+      <svg class="query-save-pin-svg" width="26" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" fill="currentColor" stroke="#ffffff" stroke-width="1.2"></path>
+        <polygon points="12 6.5 13.5 9.5 17 10 14.5 12.5 15 16 12 14.2 9 16 9.5 12.5 7 10 10.5 9.5 12 6.5" fill="#ffffff" stroke="#ffffff" stroke-width="0.4"></polygon>
+      </svg>
+    `;
+
+    const saveBadgeIcon = L.divIcon({
+      className: 'query-save-badge-container',
+      html: `<button type="button" class="query-save-badge pin-jumping-once" id="query-save-badge" aria-label="Save this location" title="Save this location">${starredPinSvg}</button>`,
+      iconSize: [26, 30],
+      iconAnchor: [-10, 26]
+    });
+
+    this.querySaveBadgeMarker = L.marker([this.queryPoint.lat, this.queryPoint.lon], {
+      icon: saveBadgeIcon,
+      interactive: true,
+      zIndexOffset: 1200
+    }).addTo(this.map);
+
+    this.querySaveBadgeMarker.on('click', (e) => {
+      if (e && e.originalEvent) {
+        e.originalEvent.stopPropagation();
+      }
+      this.openSavedLocationsModal();
+    });
+
     // Catchment Circle
     this.catchmentCircle = L.circle([this.queryPoint.lat, this.queryPoint.lon], {
       radius: this.currentRadius,
@@ -1208,6 +1237,9 @@ class BusMapApp {
     this.queryMarker.on('drag', (e) => {
       const pos = e.target.getLatLng();
       this.catchmentCircle.setLatLng(pos);
+      if (this.querySaveBadgeMarker) {
+        this.querySaveBadgeMarker.setLatLng(pos);
+      }
       this.updateUrlCoordinates(pos.lat, pos.lng);
     });
 
@@ -2147,11 +2179,19 @@ class BusMapApp {
     this.selectedRouteId = null;
     this.queryPoint = { lat, lon };
     this.queryMarker.setLatLng([lat, lon]);
+    if (this.querySaveBadgeMarker) {
+      this.querySaveBadgeMarker.setLatLng([lat, lon]);
+      this.triggerSaveBadgeJump();
+    }
     this.catchmentCircle.setLatLng([lat, lon]);
     this.triggerPinDropRipple(lat, lon);
     this.updateViewportCatchmentPill();
     this.updateUrlCoordinates(lat, lon);
     this.loadCatchment();
+    const modal = document.getElementById('saved-locations-modal');
+    if (modal && !modal.classList.contains('hidden') && typeof this.renderSavedLocationsModal === 'function') {
+      this.renderSavedLocationsModal();
+    }
   }
 
   initGeolocationDefault() {
@@ -3866,10 +3906,16 @@ class BusMapApp {
       }
 
       if (query.length < 2) {
-        dropdown.classList.remove('open');
-        dropdown.innerHTML = '';
-        this.currentSearchSuggestions = [];
-        this.selectedSuggestionIndex = -1;
+        const saved = this.getSavedLocations();
+        if (saved && saved.length > 0) {
+          this.renderSavedLocationsInSearchDropdown(saved, dropdown);
+          dropdown.classList.add('open');
+        } else {
+          dropdown.classList.remove('open');
+          dropdown.innerHTML = '';
+          this.currentSearchSuggestions = [];
+          this.selectedSuggestionIndex = -1;
+        }
         return;
       }
 
@@ -3886,6 +3932,12 @@ class BusMapApp {
         this.lastSelectedLocationName = searchInput.value.trim();
         searchInput.value = '';
         if (clearBtn) clearBtn.style.display = 'none';
+      }
+      const saved = this.getSavedLocations();
+      if (saved && saved.length > 0) {
+        this.renderSavedLocationsInSearchDropdown(saved, dropdown);
+        dropdown.classList.add('open');
+      } else {
         dropdown.classList.remove('open');
         dropdown.innerHTML = '';
         this.currentSearchSuggestions = [];
@@ -3913,10 +3965,16 @@ class BusMapApp {
         e.stopPropagation();
         searchInput.value = '';
         clearBtn.style.display = 'none';
-        dropdown.classList.remove('open');
-        dropdown.innerHTML = '';
-        this.currentSearchSuggestions = [];
-        this.selectedSuggestionIndex = -1;
+        const saved = this.getSavedLocations();
+        if (saved && saved.length > 0) {
+          this.renderSavedLocationsInSearchDropdown(saved, dropdown);
+          dropdown.classList.add('open');
+        } else {
+          dropdown.classList.remove('open');
+          dropdown.innerHTML = '';
+          this.currentSearchSuggestions = [];
+          this.selectedSuggestionIndex = -1;
+        }
         searchInput.focus();
       });
     }
@@ -4485,6 +4543,486 @@ class BusMapApp {
         filterDot.classList.add('hidden');
       }
     }
+  }
+
+  // ==========================================================================
+  // Issue #8: Saved Pins / Favourite Locations (Local Only, Max 5)
+  // ==========================================================================
+
+  initSavedLocations() {
+    this.savedLocationsStorageKey = 'catchdaride_saved_locations_v1';
+    this.maxSavedLocations = 5;
+
+    const savedBtn = document.getElementById('saved-locations-btn');
+    const modal = document.getElementById('saved-locations-modal');
+    const backdrop = document.getElementById('saved-locations-backdrop');
+    const closeBtn = document.getElementById('close-saved-modal-btn');
+    const savePinBtn = document.getElementById('save-current-pin-btn');
+    const labelInput = document.getElementById('saved-location-label-input');
+    const quickTags = document.getElementById('saved-quick-tags');
+
+    if (savedBtn) {
+      savedBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleSavedLocationsModal();
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeSavedLocationsModal();
+      });
+    }
+
+    if (backdrop) {
+      backdrop.addEventListener('click', () => {
+        this.closeSavedLocationsModal();
+      });
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+        this.closeSavedLocationsModal();
+      }
+    });
+
+    // Save pin button
+    if (savePinBtn) {
+      savePinBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const customLabel = labelInput ? labelInput.value.trim() : '';
+        this.saveCurrentLocation(customLabel);
+      });
+    }
+
+    // Quick tag pills
+    if (quickTags && labelInput) {
+      quickTags.addEventListener('click', (e) => {
+        const tagBtn = e.target.closest('.quick-tag-btn');
+        if (!tagBtn) return;
+        const tag = tagBtn.getAttribute('data-tag');
+        if (tag) {
+          labelInput.value = tag;
+          labelInput.focus();
+        }
+      });
+    }
+
+    // Enter key inside label input saves
+    if (labelInput) {
+      labelInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const customLabel = labelInput.value.trim();
+          this.saveCurrentLocation(customLabel);
+        }
+      });
+    }
+
+    this.updateSavedLocationsBadge();
+  }
+
+  getSavedLocations() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return [];
+      const raw = localStorage.getItem(this.savedLocationsStorageKey);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.slice(0, this.maxSavedLocations);
+    } catch (e) {
+      console.warn("Could not read saved locations from localStorage:", e);
+      return [];
+    }
+  }
+
+  saveLocationsList(locations) {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return false;
+      const capped = locations.slice(0, this.maxSavedLocations);
+      localStorage.setItem(this.savedLocationsStorageKey, JSON.stringify(capped));
+      this.updateSavedLocationsBadge();
+      return true;
+    } catch (e) {
+      console.warn("Could not save locations to localStorage:", e);
+      return false;
+    }
+  }
+
+  updateSavedLocationsBadge() {
+    const badge = document.getElementById('saved-locations-badge');
+    const countBadge = document.getElementById('saved-modal-count-badge');
+    const locations = this.getSavedLocations();
+    const count = locations.length;
+
+    if (badge) {
+      if (count > 0) {
+        badge.textContent = `${count}`;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    if (countBadge) {
+      countBadge.textContent = `${count} / ${this.maxSavedLocations}`;
+    }
+
+    this.triggerSaveBadgeJump();
+  }
+
+  triggerSaveBadgeJump() {
+    const badgeEl = document.getElementById('query-save-badge');
+    if (!badgeEl) return;
+    badgeEl.classList.remove('pin-jumping-once');
+    // Force DOM reflow to restart CSS animation cleanly
+    void badgeEl.offsetWidth;
+    badgeEl.classList.add('pin-jumping-once');
+
+    // Update active state visual if current location is already saved
+    const locations = typeof this.getSavedLocations === 'function' ? this.getSavedLocations() : [];
+    const currLat = this.queryPoint ? this.queryPoint.lat : 0;
+    const currLon = this.queryPoint ? this.queryPoint.lon : 0;
+    const isSaved = typeof this.findSavedIndexForPoint === 'function' 
+      ? (this.findSavedIndexForPoint(currLat, currLon, locations) !== -1)
+      : false;
+
+    if (isSaved) {
+      badgeEl.classList.add('is-saved');
+      badgeEl.setAttribute('title', 'Location saved in favorites (tap to manage)');
+    } else {
+      badgeEl.classList.remove('is-saved');
+      badgeEl.setAttribute('title', 'Save this location');
+    }
+  }
+
+  toggleSavedLocationsModal() {
+    const modal = document.getElementById('saved-locations-modal');
+    if (!modal) return;
+    if (modal.classList.contains('hidden')) {
+      this.openSavedLocationsModal();
+    } else {
+      this.closeSavedLocationsModal();
+    }
+  }
+
+  openSavedLocationsModal() {
+    const modal = document.getElementById('saved-locations-modal');
+    const backdrop = document.getElementById('saved-locations-backdrop');
+    if (!modal) return;
+
+    this.closeDrawer();
+    this.closeRouteBottomBox();
+    if (typeof this.closeDestSheet === 'function') {
+      this.closeDestSheet();
+    }
+
+    modal.classList.remove('hidden');
+    if (backdrop) backdrop.classList.remove('hidden');
+
+    this.renderSavedLocationsModal();
+
+    const labelInput = document.getElementById('saved-location-label-input');
+    if (labelInput) {
+      setTimeout(() => labelInput.focus(), 100);
+    }
+  }
+
+  closeSavedLocationsModal() {
+    const modal = document.getElementById('saved-locations-modal');
+    const backdrop = document.getElementById('saved-locations-backdrop');
+    if (modal) modal.classList.add('hidden');
+    if (backdrop) backdrop.classList.add('hidden');
+  }
+
+  findSavedIndexForPoint(lat, lon, locations) {
+    // Check for match within ~30 meters (0.0003 deg)
+    return locations.findIndex(loc => {
+      return Math.abs(loc.lat - lat) < 0.0003 && Math.abs(loc.lon - lon) < 0.0003;
+    });
+  }
+
+  renderSavedLocationsModal() {
+    const locations = this.getSavedLocations();
+    const count = locations.length;
+    this.updateSavedLocationsBadge();
+
+    // 1. Current Pin Name
+    const pinNameEl = document.getElementById('saved-current-pin-name');
+    const labelInput = document.getElementById('saved-location-label-input');
+    const saveBtn = document.getElementById('save-current-pin-btn');
+    const saveBtnText = document.getElementById('save-btn-text');
+    const limitWarning = document.getElementById('saved-limit-warning');
+
+    const currLat = this.queryPoint ? this.queryPoint.lat : 0;
+    const currLon = this.queryPoint ? this.queryPoint.lon : 0;
+    const resolvedName = (this.lastSelectedLocationName && this.lastSelectedLocationName.trim()) 
+      ? this.lastSelectedLocationName.trim() 
+      : `Lat: ${currLat.toFixed(4)}, Lon: ${currLon.toFixed(4)}`;
+
+    if (pinNameEl) {
+      pinNameEl.textContent = `${resolvedName} (${currLat.toFixed(4)}, ${currLon.toFixed(4)})`;
+    }
+
+    const existingIndex = this.findSavedIndexForPoint(currLat, currLon, locations);
+    const isAlreadySaved = existingIndex !== -1;
+
+    if (isAlreadySaved) {
+      const existing = locations[existingIndex];
+      if (labelInput && !labelInput.value) {
+        labelInput.value = existing.label || '';
+      }
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        if (saveBtnText) saveBtnText.textContent = 'Update Saved Pin';
+      }
+      if (limitWarning) limitWarning.classList.add('hidden');
+    } else {
+      if (count >= this.maxSavedLocations) {
+        if (saveBtn) {
+          saveBtn.disabled = true;
+          if (saveBtnText) saveBtnText.textContent = 'Save Pin (Limit Reached)';
+        }
+        if (limitWarning) limitWarning.classList.remove('hidden');
+      } else {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          if (saveBtnText) saveBtnText.textContent = 'Save Current Pin';
+        }
+        if (limitWarning) limitWarning.classList.add('hidden');
+      }
+    }
+
+    // 2. Render List or Empty State
+    const listEl = document.getElementById('saved-locations-list');
+    const emptyEl = document.getElementById('saved-locations-empty');
+
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    if (count === 0) {
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      listEl.classList.add('hidden');
+    } else {
+      if (emptyEl) emptyEl.classList.add('hidden');
+      listEl.classList.remove('hidden');
+
+      locations.forEach((item) => {
+        const card = document.createElement('div');
+        card.className = 'saved-location-card';
+        card.setAttribute('role', 'listitem');
+        card.setAttribute('tabindex', '0');
+
+        // Extract emoji icon if present in label
+        let icon = '📍';
+        if (item.label.includes('🏠')) icon = '🏠';
+        else if (item.label.includes('💼')) icon = '💼';
+        else if (item.label.includes('⭐')) icon = '⭐';
+        else if (item.label.includes('🎓')) icon = '🎓';
+        else if (item.label.includes('🏋️')) icon = '🏋️';
+        else if (item.label.includes('☕')) icon = '☕';
+
+        // Calculate distance from current queryPoint
+        const distMeters = Math.round(haversineMeters(currLat, currLon, item.lat, item.lon));
+        let distStr = '';
+        if (distMeters < 50) {
+          distStr = 'Active Pin Location';
+        } else if (distMeters < 1000) {
+          distStr = `${distMeters}m away`;
+        } else {
+          distStr = `${(distMeters / 1000).toFixed(1)}km away`;
+        }
+
+        const subtitle = item.name && item.name !== item.label 
+          ? `${item.name} • ${distStr}`
+          : `${item.lat.toFixed(4)}, ${item.lon.toFixed(4)} • ${distStr}`;
+
+        card.innerHTML = `
+          <div class="saved-card-main">
+            <span class="saved-card-icon">${icon}</span>
+            <div class="saved-card-text">
+              <span class="saved-card-label">${this.escapeHtml(item.label || item.name)}</span>
+              <span class="saved-card-sub">${this.escapeHtml(subtitle)}</span>
+            </div>
+          </div>
+          <button type="button" class="saved-card-delete-btn" aria-label="Delete ${this.escapeHtml(item.label)}" title="Delete saved place">&times;</button>
+        `;
+
+        // Click on card body jumps to location
+        card.querySelector('.saved-card-main').addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.jumpToSavedLocation(item);
+        });
+
+        // Keydown Enter / Space jumps
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.jumpToSavedLocation(item);
+          }
+        });
+
+        // Click on delete button
+        const delBtn = card.querySelector('.saved-card-delete-btn');
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.deleteSavedLocation(item.id);
+        });
+
+        listEl.appendChild(card);
+      });
+    }
+  }
+
+  escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  saveCurrentLocation(customLabel) {
+    const locations = this.getSavedLocations();
+    const currLat = this.queryPoint ? this.queryPoint.lat : 0;
+    const currLon = this.queryPoint ? this.queryPoint.lon : 0;
+    const resolvedName = (this.lastSelectedLocationName && this.lastSelectedLocationName.trim()) 
+      ? this.lastSelectedLocationName.trim() 
+      : `Location (${currLat.toFixed(4)}, ${currLon.toFixed(4)})`;
+
+    const labelToSave = (customLabel && customLabel.trim().length > 0)
+      ? customLabel.trim()
+      : resolvedName;
+
+    const existingIndex = this.findSavedIndexForPoint(currLat, currLon, locations);
+
+    if (existingIndex !== -1) {
+      // Update existing item
+      locations[existingIndex].label = labelToSave;
+      locations[existingIndex].name = resolvedName;
+      locations[existingIndex].updatedAt = Date.now();
+      this.saveLocationsList(locations);
+      this.renderSavedLocationsModal();
+      this.showToastNotification(`Updated "${labelToSave}"`);
+      return;
+    }
+
+    if (locations.length >= this.maxSavedLocations) {
+      this.renderSavedLocationsModal();
+      this.showToastNotification('Maximum 5 saved locations reached');
+      return;
+    }
+
+    const newItem = {
+      id: `loc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      label: labelToSave,
+      name: resolvedName,
+      lat: currLat,
+      lon: currLon,
+      createdAt: Date.now()
+    };
+
+    locations.unshift(newItem);
+    this.saveLocationsList(locations);
+    this.renderSavedLocationsModal();
+
+    const labelInput = document.getElementById('saved-location-label-input');
+    if (labelInput) labelInput.value = '';
+
+    this.showToastNotification(`Saved "${labelToSave}" locally`);
+  }
+
+  deleteSavedLocation(id) {
+    let locations = this.getSavedLocations();
+    const itemToDelete = locations.find(loc => loc.id === id);
+    locations = locations.filter(loc => loc.id !== id);
+    this.saveLocationsList(locations);
+    this.renderSavedLocationsModal();
+    if (itemToDelete) {
+      this.showToastNotification(`Removed "${itemToDelete.label || itemToDelete.name}"`);
+    }
+  }
+
+  jumpToSavedLocation(item) {
+    this.closeSavedLocationsModal();
+    this.lastSelectedLocationName = item.label || item.name;
+    const searchInput = document.getElementById('location-search-input');
+    const locNameElem = document.getElementById('query-location-name');
+    const clearBtn = document.getElementById('location-clear-btn');
+
+    if (searchInput) {
+      searchInput.value = item.label || item.name;
+      if (clearBtn) clearBtn.style.display = 'flex';
+    }
+    if (locNameElem) {
+      locNameElem.textContent = item.label || item.name;
+    }
+
+    this.setQueryLocation(item.lat, item.lon);
+    if (this.map) {
+      this.map.flyTo([item.lat, item.lon], 15);
+    }
+    this.showToastNotification(`Viewing "${item.label || item.name}"`);
+  }
+
+  showToastNotification(message) {
+    const shareToast = document.getElementById('share-feedback-toast');
+    const shareMsg = document.getElementById('share-toast-message');
+    if (shareToast && shareMsg) {
+      shareMsg.textContent = message;
+      shareToast.classList.remove('hidden');
+      shareToast.classList.add('visible');
+      setTimeout(() => {
+        shareToast.classList.remove('visible');
+        setTimeout(() => shareToast.classList.add('hidden'), 250);
+      }, 2000);
+    }
+  }
+
+  renderSavedLocationsInSearchDropdown(saved, dropdown) {
+    dropdown.innerHTML = '';
+    const section = document.createElement('div');
+    section.className = 'search-saved-section';
+
+    const header = document.createElement('div');
+    header.className = 'search-saved-header';
+    header.innerHTML = `<span>⭐</span><span>Saved Places (${saved.length}/5 • Local)</span>`;
+    section.appendChild(header);
+
+    saved.forEach((loc) => {
+      const item = document.createElement('div');
+      item.className = 'location-suggestion-item search-saved-item';
+      item.setAttribute('role', 'option');
+
+      let icon = '📍';
+      if (loc.label.includes('🏠')) icon = '🏠';
+      else if (loc.label.includes('💼')) icon = '💼';
+      else if (loc.label.includes('⭐')) icon = '⭐';
+      else if (loc.label.includes('🎓')) icon = '🎓';
+      else if (loc.label.includes('🏋️')) icon = '🏋️';
+      else if (loc.label.includes('☕')) icon = '☕';
+
+      item.innerHTML = `
+        <span class="location-suggestion-icon">${icon}</span>
+        <div class="location-suggestion-text">
+          <span class="location-suggestion-title">${this.escapeHtml(loc.label)}</span>
+          <span class="location-suggestion-subtitle">${this.escapeHtml(loc.name || `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}`)}</span>
+        </div>
+      `;
+
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.selectSearchResult({ lat: loc.lat, lon: loc.lon, name: loc.label || loc.name });
+      });
+
+      section.appendChild(item);
+    });
+
+    dropdown.appendChild(section);
   }
 }
 
