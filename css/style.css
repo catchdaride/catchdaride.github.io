@@ -122,6 +122,17 @@ html, body {
   border-color: var(--border-light);
 }
 
+.icon-btn.loading svg,
+#locate-me-btn.loading svg {
+  animation: pulse-locate 1s infinite alternate;
+  color: var(--primary);
+}
+
+@keyframes pulse-locate {
+  from { opacity: 0.4; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+
 .brand {
   display: flex;
   align-items: center;
