@@ -4194,6 +4194,13 @@ path.leaflet-interactive:active,
   max-width: 260px;
 }
 
+.hub-seo-banner.dismissed {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  visibility: hidden;
+}
+
 /* ==========================================================================
    Share Location Button & Toast Notification (Issue #7)
    ========================================================================== */
