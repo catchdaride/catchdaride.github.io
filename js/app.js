@@ -1595,23 +1595,7 @@ class BusMapApp {
     const locateBtn = document.getElementById('locate-me-btn');
     if (locateBtn) {
       locateBtn.addEventListener('click', () => {
-        trackAnalyticsEvent('locate_me');
-        if (!navigator.geolocation) {
-          this.showToast("⚠️ Geolocation is not supported by your browser.");
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
-            this.setQueryLocation(lat, lon);
-            this.map.flyTo([lat, lon], 15);
-          },
-          (err) => {
-            this.showToast("⚠️ Unable to retrieve your GPS location.");
-          },
-          { enableHighAccuracy: true }
-        );
+        this.handleLocateMe();
       });
     }
 
@@ -1944,7 +1928,7 @@ class BusMapApp {
     requestAnimationFrame(step);
   }
 
-  showToast(message) {
+  showToast(message, duration = 4000) {
     const container = document.getElementById('toast-container');
     if (!container) return;
     const toast = document.createElement('div');
@@ -1953,7 +1937,7 @@ class BusMapApp {
     container.appendChild(toast);
     setTimeout(() => {
       toast.remove();
-    }, 4000);
+    }, duration);
   }
 
   buildShareUrl() {
@@ -2247,7 +2231,7 @@ class BusMapApp {
     }
   }
 
-  initGeolocationDefault() {
+  async initGeolocationDefault() {
     // If arriving via an explicit deep-link (e.g. from an SEO hub landing page),
     // preserve the deep-linked location and do NOT overwrite it with device GPS.
     if (this.isDeepLinked) {
@@ -2255,6 +2239,29 @@ class BusMapApp {
       return;
     }
     if (!navigator.geolocation) return;
+
+    // Guard against unprompted background geolocation on iOS / WebKit, which causes
+    // immediate silent PERMISSION_DENIED and can lead to permissions being stuck.
+    const isIOS = (typeof navigator !== 'undefined') && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+    if (isIOS) {
+      console.info("iOS detected; skipping unprompted page-load geolocation to comply with WebKit user-activation policy.");
+      return;
+    }
+
+    // For modern browsers with Permissions API (e.g. Chrome / Android), only auto-locate
+    // if permission was ALREADY granted by the user on a previous session.
+    if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+      try {
+        const perm = await navigator.permissions.query({ name: 'geolocation' });
+        if (perm && perm.state !== 'granted') {
+          console.info(`Geolocation permission is '${perm.state}'; skipping unprompted page-load prompt.`);
+          return;
+        }
+      } catch (_) {}
+    }
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -2297,7 +2304,89 @@ class BusMapApp {
       (err) => {
         console.info(`Initial device geolocation not available; keeping regional hub (${this.lastSelectedLocationName}):`, err?.message || err);
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
+    );
+  }
+
+  handleLocateMe() {
+    trackAnalyticsEvent('locate_me');
+    if (!navigator.geolocation) {
+      this.showToast("⚠️ Geolocation is not supported by your browser.");
+      return;
+    }
+
+    const locateBtn = document.getElementById('locate-me-btn');
+    if (locateBtn) {
+      locateBtn.classList.add('loading');
+    }
+    this.showToast("📍 Acquiring location...");
+
+    const isIOS = (typeof navigator !== 'undefined') && (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+    const isSafari = isIOS && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|OPiOS|mercury/i.test(navigator.userAgent);
+
+    const onLocationSuccess = (pos) => {
+      if (locateBtn) locateBtn.classList.remove('loading');
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      this.setQueryLocation(lat, lon);
+      if (this.map) {
+        this.map.flyTo([lat, lon], 15);
+      }
+      trackAnalyticsEvent('locate_me_status', {
+        status: 'success',
+        accuracy: (pos.coords && pos.coords.accuracy) ? Math.round(pos.coords.accuracy) : 0
+      });
+    };
+
+    const handlePermissionDenied = () => {
+      if (locateBtn) locateBtn.classList.remove('loading');
+      trackAnalyticsEvent('locate_me_status', { status: 'permission_denied' });
+      if (isIOS) {
+        if (isSafari) {
+          this.showToast("📍 Location access is blocked. In Safari, tap 'aA' in the address bar → Website Settings to allow Location.", 6500);
+        } else {
+          this.showToast("📍 Location access is blocked. In Chrome, tap the tune/lock icon in the address bar to allow Location.", 6500);
+        }
+      } else {
+        this.showToast("📍 Location access is blocked. Please allow location permissions in your browser settings.", 5500);
+      }
+    };
+
+    const handleFinalError = (err) => {
+      if (locateBtn) locateBtn.classList.remove('loading');
+      trackAnalyticsEvent('locate_me_status', { status: 'failed', code: err?.code || 0 });
+      if (err && err.code === 1) {
+        handlePermissionDenied();
+      } else {
+        this.showToast("⚠️ Location signal unavailable. Please check your GPS/Wi-Fi signal or search for your station.", 5000);
+      }
+    };
+
+    // Stage 1: High accuracy GPS attempt with 5000ms timeout
+    navigator.geolocation.getCurrentPosition(
+      onLocationSuccess,
+      (err) => {
+        // If user explicitly denied permission, do not retry - guide user immediately
+        if (err && err.code === 1) {
+          handlePermissionDenied();
+          return;
+        }
+
+        // Stage 2: Fallback for indoors / weak GPS satellites (TIMEOUT or POSITION_UNAVAILABLE).
+        // Uses fast Wi-Fi / cellular triangulation without demanding satellite lock.
+        console.warn("High-accuracy location timed out or unavailable indoors. Retrying with standard triangulation...", err);
+        navigator.geolocation.getCurrentPosition(
+          onLocationSuccess,
+          (err2) => {
+            handleFinalError(err2);
+          },
+          { enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 }
+        );
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
     );
   }
 
