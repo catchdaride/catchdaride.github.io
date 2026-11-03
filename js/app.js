@@ -1968,6 +1968,20 @@ class BusMapApp {
         pathname = '/';
       }
 
+      // If user moved outside initial hub catchment (> 400m), share via root URL (Issue #16)
+      if (pathname !== '/' && typeof window !== 'undefined' && window.INITIAL_LOCATION && this.queryPoint) {
+        const hubLat = window.INITIAL_LOCATION.lat;
+        const hubLon = window.INITIAL_LOCATION.lon;
+        const hubRadius = window.INITIAL_LOCATION.radius || 400;
+        if (typeof hubLat === 'number' && typeof hubLon === 'number' &&
+            typeof this.queryPoint.lat === 'number' && typeof this.queryPoint.lon === 'number') {
+          const distFromHub = haversineMeters(hubLat, hubLon, this.queryPoint.lat, this.queryPoint.lon);
+          if (distFromHub > hubRadius) {
+            pathname = '/';
+          }
+        }
+      }
+
       // Eliminate coordinate and mode redundancy from search query parameters
       let search = '';
       if (typeof window !== 'undefined' && window.location && window.location.search) {
@@ -2164,7 +2178,27 @@ class BusMapApp {
       }
 
       const newSearch = params.toString() ? `?${params.toString()}` : '';
-      const newUrl = `${window.location.pathname}${newSearch}${window.location.hash || ''}`;
+      let pathname = (typeof window !== 'undefined' && window.location && window.location.pathname) ? window.location.pathname : '/';
+      if (pathname.endsWith('/index.html')) {
+        pathname = pathname.slice(0, -10) || '/';
+      } else if (pathname === 'index.html') {
+        pathname = '/';
+      }
+
+      // If user moved outside initial hub catchment (> 400m), revert URL pathname to root '/' (Issue #16)
+      if (pathname !== '/' && typeof window !== 'undefined' && window.INITIAL_LOCATION) {
+        const hubLat = window.INITIAL_LOCATION.lat;
+        const hubLon = window.INITIAL_LOCATION.lon;
+        const hubRadius = window.INITIAL_LOCATION.radius || 400;
+        if (typeof hubLat === 'number' && typeof hubLon === 'number') {
+          const distFromHub = haversineMeters(hubLat, hubLon, targetLat, targetLon);
+          if (distFromHub > hubRadius) {
+            pathname = '/';
+          }
+        }
+      }
+
+      const newUrl = `${pathname}${newSearch}${window.location.hash || ''}`;
       window.history.replaceState({}, '', newUrl);
     } catch (e) {
       console.warn("Unable to update URL coordinates:", e);
@@ -2177,6 +2211,25 @@ class BusMapApp {
     this.closeRouteBottomBox();
     this.clearStopPins();
     this.selectedRouteId = null;
+
+    // Auto-dismiss the location intro box if user moves outside initial hub catchment (> 400m) (Issue #16)
+    if (typeof window !== 'undefined' && window.INITIAL_LOCATION && typeof lat === 'number' && typeof lon === 'number') {
+      const hubLat = window.INITIAL_LOCATION.lat;
+      const hubLon = window.INITIAL_LOCATION.lon;
+      const hubRadius = window.INITIAL_LOCATION.radius || 400;
+      if (typeof hubLat === 'number' && typeof hubLon === 'number') {
+        const distFromHub = haversineMeters(hubLat, hubLon, lat, lon);
+        if (distFromHub > hubRadius) {
+          const banner = document.getElementById('hub-seo-banner');
+          if (banner && !banner.classList.contains('dismissed')) {
+            banner.classList.add('dismissed');
+            setTimeout(() => {
+              banner.style.display = 'none';
+            }, 250);
+          }
+        }
+      }
+    }
     this.queryPoint = { lat, lon };
     this.queryMarker.setLatLng([lat, lon]);
     if (this.querySaveBadgeMarker) {
