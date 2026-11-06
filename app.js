@@ -863,6 +863,7 @@ class BusMapApp {
     this.currentSearchSuggestions = [];
     this.selectedSuggestionIndex = -1;
     this.agencyCategoriesMap = new Map();
+    this.savedLocationsLayer = null;
 
     // Client-side Caches (OPT-4)
     this.catchmentCache = new Map();
@@ -1212,6 +1213,9 @@ class BusMapApp {
       }
       this.openSavedLocationsModal();
     });
+
+    // Saved Locations Layer (Issue #20: Map Pins for Bookmarked Places)
+    this.savedLocationsLayer = L.layerGroup().addTo(this.map);
 
     // Catchment Circle
     this.catchmentCircle = L.circle([this.queryPoint.lat, this.queryPoint.lon], {
@@ -2228,6 +2232,9 @@ class BusMapApp {
     const modal = document.getElementById('saved-locations-modal');
     if (modal && !modal.classList.contains('hidden') && typeof this.renderSavedLocationsModal === 'function') {
       this.renderSavedLocationsModal();
+    }
+    if (typeof this.renderSavedLocationsOnMap === 'function') {
+      this.renderSavedLocationsOnMap();
     }
   }
 
@@ -4764,6 +4771,7 @@ class BusMapApp {
     }
 
     this.updateSavedLocationsBadge();
+    this.renderSavedLocationsOnMap();
   }
 
   getSavedLocations() {
@@ -4786,6 +4794,9 @@ class BusMapApp {
       const capped = locations.slice(0, this.maxSavedLocations);
       localStorage.setItem(this.savedLocationsStorageKey, JSON.stringify(capped));
       this.updateSavedLocationsBadge();
+      if (typeof this.renderSavedLocationsOnMap === 'function') {
+        this.renderSavedLocationsOnMap();
+      }
       return true;
     } catch (e) {
       console.warn("Could not save locations to localStorage:", e);
@@ -5018,6 +5029,119 @@ class BusMapApp {
     }
   }
 
+  // Issue #20: Saved Location Pins on Map Layer with Inverted Red/White Icon & Interactive Popups
+  renderSavedLocationsOnMap() {
+    if (!this.map || !this.savedLocationsLayer) return;
+
+    this.savedLocationsLayer.clearLayers();
+
+    const locations = this.getSavedLocations();
+    if (!locations || locations.length === 0) return;
+
+    const currLat = this.queryPoint ? this.queryPoint.lat : 0;
+    const currLon = this.queryPoint ? this.queryPoint.lon : 0;
+
+    locations.forEach((item) => {
+      // Inverted red and white pin icon:
+      // Pin body: white fill (#ffffff), red stroke (#ef4444)
+      // Star polygon: red fill (#ef4444), red stroke (#ef4444)
+      const savedPinSvg = `
+        <svg class="saved-location-pin-svg" width="26" height="30" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" fill="#ffffff" stroke="#ef4444" stroke-width="1.5"></path>
+          <polygon points="12 6.5 13.5 9.5 17 10 14.5 12.5 15 16 12 14.2 9 16 9.5 12.5 7 10 10.5 9.5 12 6.5" fill="#ef4444" stroke="#ef4444" stroke-width="0.4"></polygon>
+        </svg>
+      `;
+
+      const pinIcon = L.divIcon({
+        className: 'saved-location-pin-container',
+        html: `<div class="saved-location-pin-marker" role="button" tabindex="0" aria-label="Saved place: ${this.escapeHtml(item.label || item.name)}" title="${this.escapeHtml(item.label || item.name)}">${savedPinSvg}</div>`,
+        iconSize: [26, 30],
+        iconAnchor: [13, 28],
+        popupAnchor: [0, -28]
+      });
+
+      const marker = L.marker([item.lat, item.lon], {
+        icon: pinIcon,
+        zIndexOffset: 900
+      });
+
+      // Extract emoji icon if present in label
+      let icon = '📍';
+      if (item.label && item.label.includes('🏠')) icon = '🏠';
+      else if (item.label && item.label.includes('💼')) icon = '💼';
+      else if (item.label && item.label.includes('⭐')) icon = '⭐';
+      else if (item.label && item.label.includes('🎓')) icon = '🎓';
+      else if (item.label && item.label.includes('🏋️')) icon = '🏋️';
+      else if (item.label && item.label.includes('☕')) icon = '☕';
+
+      // Distance calculation from current queryPoint
+      const distMeters = Math.round(haversineMeters(currLat, currLon, item.lat, item.lon));
+      const isCurrentActive = distMeters < 50;
+
+      let distStr = '';
+      if (isCurrentActive) {
+        distStr = 'Active Current Location';
+      } else if (distMeters < 1000) {
+        distStr = `${distMeters}m from current location`;
+      } else {
+        distStr = `${(distMeters / 1000).toFixed(1)}km from current location`;
+      }
+
+      const subtitle = item.name && item.name !== item.label 
+        ? item.name 
+        : `${item.lat.toFixed(4)}, ${item.lon.toFixed(4)}`;
+
+      const popupHtml = `
+        <div class="saved-location-popup-content">
+          <div class="saved-popup-header">
+            <span class="saved-popup-icon">${icon}</span>
+            <div class="saved-popup-title-wrap">
+              <div class="saved-popup-title">${this.escapeHtml(item.label || item.name)}</div>
+              <div class="saved-popup-subtitle">${this.escapeHtml(subtitle)}</div>
+            </div>
+          </div>
+          <div class="saved-popup-meta">
+            ${isCurrentActive 
+              ? '<span class="saved-popup-badge-active">Active Current Location</span>' 
+              : `<span class="saved-popup-dist">${this.escapeHtml(distStr)}</span>`}
+          </div>
+          <div class="saved-popup-actions">
+            <button type="button" class="saved-popup-set-btn" aria-label="Set as current location">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <span>Set as Current Location</span>
+            </button>
+          </div>
+        </div>
+      `;
+
+      marker.bindPopup(popupHtml, {
+        className: 'saved-location-popup',
+        maxWidth: 280,
+        minWidth: 220,
+        closeButton: true,
+        autoPan: true
+      });
+
+      marker.on('popupopen', (e) => {
+        const popupElem = e.popup.getElement();
+        if (popupElem) {
+          const setBtn = popupElem.querySelector('.saved-popup-set-btn');
+          if (setBtn) {
+            setBtn.onclick = (ev) => {
+              ev.stopPropagation();
+              this.jumpToSavedLocation(item);
+            };
+          }
+        }
+      });
+
+      this.savedLocationsLayer.addLayer(marker);
+    });
+  }
+
   escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -5090,6 +5214,9 @@ class BusMapApp {
   }
 
   jumpToSavedLocation(item) {
+    if (this.map) {
+      this.map.closePopup();
+    }
     this.closeSavedLocationsModal();
     this.lastSelectedLocationName = item.label || item.name;
     const searchInput = document.getElementById('location-search-input');
