@@ -21,12 +21,19 @@ function getApiBase() {
   if (window.CATCHDARIDE_API_BASE) {
     return window.CATCHDARIDE_API_BASE.replace(/\/+$/, '');
   }
+  const host = (window.location && window.location.hostname) || '';
+  const port = (window.location && window.location.port) || '';
+
+  // Crucial: When running directly on any PythonAnywhere backend (e.g. padev1 or geohoo),
+  // ALWAYS use same-origin relative endpoints so testing/staging never calls production!
+  if (host.endsWith('pythonanywhere.com')) {
+    return '';
+  }
+
   const metaApi = typeof document !== 'undefined' ? document.querySelector('meta[name="api-base"]') : null;
   if (metaApi && metaApi.content) {
     return metaApi.content.replace(/\/+$/, '');
   }
-  const host = (window.location && window.location.hostname) || '';
-  const port = (window.location && window.location.port) || '';
   if (host === 'catchdaride.github.io' || host.endsWith('.github.io')) {
     return 'https://geohoo.pythonanywhere.com';
   }
@@ -237,6 +244,27 @@ function formatRouteBadge(route) {
   if (!route || !route.shortName) return '';
   const icon = getModalIcon(route.category, route.shortName);
   return `${icon} ${route.shortName}`;
+}
+
+/**
+ * Issue #18: Resolve official route details & timetable link.
+ * Backend-driven template architecture: Reads route.officialUrl (or route.official_url)
+ * provided by the backend API.
+ * Returns { url, label, shortLabel, provider } or null if not applicable / unsupported.
+ */
+function resolveOfficialRouteLink(route, currentAgencyId) {
+  if (!route) return null;
+  const url = route.officialUrl || route.official_url;
+  if (!url) return null;
+
+  const shortName = (route.shortName || route.short_name || '').trim();
+  const displayNum = shortName || 'Route';
+  return {
+    url: url,
+    label: 'Official ' + displayNum + ' Timetable ↗',
+    shortLabel: displayNum + ' ↗',
+    provider: 'Official'
+  };
 }
 
 // Sub-Pixel Polyline Offset calculation formula
@@ -1739,11 +1767,26 @@ class BusMapApp {
       });
     }
 
+    // Issue #18: Official Route & Timetable Links
+    const bottomCardOfficialLink = document.getElementById('bottom-card-official-link');
+    if (bottomCardOfficialLink) {
+      bottomCardOfficialLink.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
+
+    const drawerOfficialLink = document.getElementById('drawer-official-link');
+    if (drawerOfficialLink) {
+      drawerOfficialLink.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
+
     // UX-6: Bottom Card Body Tap & Upward Swipe to Expand Drawer
     const bottomCardMain = document.getElementById('bottom-card-main');
     if (bottomCardMain) {
       bottomCardMain.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return;
+        if (e.target.closest('button') || e.target.closest('a')) return;
         if (this.selectedRouteId) {
           const route = this.activeRoutes.find(r => r.id === this.selectedRouteId);
           if (route) this.openDrawer(route);
@@ -1761,7 +1804,7 @@ class BusMapApp {
       }, { passive: true });
 
       bottomCard.addEventListener('touchend', (e) => {
-        if (e.target.closest('button')) return;
+        if (e.target.closest('button') || e.target.closest('a')) return;
         if (e.changedTouches && e.changedTouches.length > 0) {
           const deltaY = bTouchStartY - e.changedTouches[0].clientY;
           if (deltaY > 35 && this.selectedRouteId) {
@@ -3316,6 +3359,23 @@ class BusMapApp {
       };
     }
 
+    // Issue #18: Update Official Route & Timetable link for bottom card
+    const officialLinkInfo = resolveOfficialRouteLink(route, this.currentAgencyId);
+    const bottomOfficialLink = document.getElementById('bottom-card-official-link');
+    if (bottomOfficialLink) {
+      if (officialLinkInfo) {
+        bottomOfficialLink.href = officialLinkInfo.url;
+        bottomOfficialLink.style.display = 'inline-flex';
+        bottomOfficialLink.title = `${officialLinkInfo.label} (opens in new tab)`;
+        const fullSpan = bottomOfficialLink.querySelector('.official-btn-text-full');
+        const shortSpan = bottomOfficialLink.querySelector('.official-btn-text-short');
+        if (fullSpan) fullSpan.textContent = 'Official Site ↗';
+        if (shortSpan) shortSpan.textContent = 'Official ↗';
+      } else {
+        bottomOfficialLink.style.display = 'none';
+      }
+    }
+
     box.classList.add('open');
   }
 
@@ -3644,6 +3704,24 @@ class BusMapApp {
     document.getElementById('drawer-frequency').textContent = route.frequency || 'N/A';
     document.getElementById('drawer-span').textContent = route.span || 'Standard Span';
     document.getElementById('drawer-distance').textContent = `${route.distanceKm || '0'} km`;
+
+    // Issue #18: Resolve and populate Official Route & Timetable link for drawer
+    const officialLinkInfo = resolveOfficialRouteLink(route, this.currentAgencyId);
+    const drawerOfficialRow = document.getElementById('drawer-official-link-row');
+    const drawerOfficialLink = document.getElementById('drawer-official-link');
+    const drawerOfficialText = document.getElementById('drawer-official-link-text');
+    if (drawerOfficialRow && drawerOfficialLink) {
+      if (officialLinkInfo) {
+        drawerOfficialRow.style.display = 'block';
+        drawerOfficialLink.href = officialLinkInfo.url;
+        drawerOfficialLink.title = `${officialLinkInfo.label} (opens in new tab)`;
+        if (drawerOfficialText) {
+          drawerOfficialText.textContent = officialLinkInfo.label;
+        }
+      } else {
+        drawerOfficialRow.style.display = 'none';
+      }
+    }
 
     // Dynamic Service Variations Selector Container
     const varContainer = document.getElementById('variations-selector-container');
@@ -5300,7 +5378,7 @@ window.addEventListener('DOMContentLoaded', () => {
   window.busMapApp = new BusMapApp();
 });
 
-// Expose animation helpers for testability
+// Expose helpers for testability
 if (typeof window !== 'undefined') {
   window.calculateBearing = calculateBearing;
   window.findRouteNearestVertex = findRouteNearestVertex;
@@ -5309,6 +5387,7 @@ if (typeof window !== 'undefined') {
   window.buildWavefrontPolygonPoints = buildWavefrontPolygonPoints;
   window.precomputeWavefrontOffsets = precomputeWavefrontOffsets;
   window.getAdaptiveLODVertices = getAdaptiveLODVertices;
+  window.resolveOfficialRouteLink = resolveOfficialRouteLink;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -5320,6 +5399,7 @@ if (typeof module !== 'undefined' && module.exports) {
     buildWavefrontPolygonPoints,
     precomputeWavefrontOffsets,
     getAdaptiveLODVertices,
-    haversineMeters
+    haversineMeters,
+    resolveOfficialRouteLink
   };
 }
