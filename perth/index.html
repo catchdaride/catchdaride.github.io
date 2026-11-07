@@ -350,7 +350,7 @@
                   <span class="about-badge-beta">BETA</span>
                 </div>
                 <div class="about-version-row">
-                  <span class="about-version-badge">Version 0.6.9</span>
+                  <span class="about-version-badge">Version 0.6.10</span>
                 </div>
                 <p class="about-app-desc">Interactive public transit catchment &amp; walking radius explorer</p>
               </div>
@@ -554,7 +554,7 @@
 
         <!-- Bottom Route Info Card (Floating box on route selection) -->
         <div class="route-bottom-card" id="route-bottom-card">
-          <!-- Top Row: Route identity, title, via, and action buttons -->
+          <!-- Top Row: Route identity, title, via, and dismiss button -->
           <div class="bottom-card-top-row">
             <div class="bottom-card-main" id="bottom-card-main" title="Tap to expand full route details">
               <div class="bottom-card-badge-col">
@@ -568,41 +568,49 @@
                 <div class="bottom-card-via" id="bottom-route-via">via Eastern Fwy &amp; Blackburn Rd</div>
               </div>
             </div>
+            <button id="close-bottom-card-btn" class="close-btn bottom-card-close" aria-label="Dismiss Info" title="Dismiss (Esc)">&times;</button>
+          </div>
+
+          <!-- Bottom Tier: Stats Group & Action Buttons -->
+          <div class="bottom-card-details-row">
+            <div class="bottom-card-stats-group">
+              <div class="bottom-card-stat">
+                <span class="stat-icon">⏱️</span>
+                <span class="stat-label">Frequency:</span>
+                <strong id="bottom-route-freq" class="stat-val">Every 10-15 mins</strong>
+              </div>
+              <div class="bottom-card-stat">
+                <span class="stat-icon">🕒</span>
+                <span class="stat-label">Operating Span:</span>
+                <strong id="bottom-route-span" class="stat-val">24 hours (Night Network)</strong>
+              </div>
+              <div class="bottom-card-stat">
+                <span class="stat-icon">📏</span>
+                <span class="stat-label">Length:</span>
+                <strong id="bottom-route-dist" class="stat-val">31.4 km</strong>
+              </div>
+              <div class="bottom-card-stat">
+                <span class="stat-icon">🚏</span>
+                <span class="stat-label">Stops:</span>
+                <strong id="bottom-route-stops" class="stat-val">14 stops</strong>
+              </div>
+            </div>
+
             <div class="bottom-card-actions">
               <button id="bottom-card-fit-btn" class="bottom-card-btn bottom-card-fit-btn" title="Fit Map to Entire Route">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
                 <span>Fit</span>
               </button>
-              <button id="bottom-card-detail-btn" class="bottom-card-btn" title="View Detailed Route Timeline and Stops">
+              <a id="bottom-card-official-link" class="bottom-card-btn bottom-card-official-btn" href="#" target="_blank" rel="noopener noreferrer" title="View Official Route &amp; Timetable">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                <span class="official-btn-text-full">Official Site ↗</span>
+                <span class="official-btn-text-short">Official ↗</span>
+              </a>
+              <button id="bottom-card-detail-btn" class="bottom-card-btn bottom-card-detail-btn" title="View Detailed Route Timeline and Stops">
                 <span class="detail-btn-text-full">Detailed Info</span>
                 <span class="detail-btn-text-short">Details</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
               </button>
-              <button id="close-bottom-card-btn" class="close-btn bottom-card-close" aria-label="Dismiss Info" title="Dismiss (Esc)">&times;</button>
-            </div>
-          </div>
-
-          <!-- Bottom Row: Detailed Route Metrics & Operating Stats -->
-          <div class="bottom-card-details-row">
-            <div class="bottom-card-stat">
-              <span class="stat-icon">⏱️</span>
-              <span class="stat-label">Frequency:</span>
-              <strong id="bottom-route-freq" class="stat-val">Every 10-15 mins</strong>
-            </div>
-            <div class="bottom-card-stat">
-              <span class="stat-icon">🕒</span>
-              <span class="stat-label">Operating Span:</span>
-              <strong id="bottom-route-span" class="stat-val">24 hours (Night Network)</strong>
-            </div>
-            <div class="bottom-card-stat">
-              <span class="stat-icon">📏</span>
-              <span class="stat-label">Length:</span>
-              <strong id="bottom-route-dist" class="stat-val">31.4 km</strong>
-            </div>
-            <div class="bottom-card-stat">
-              <span class="stat-icon">🚏</span>
-              <span class="stat-label">Stops:</span>
-              <strong id="bottom-route-stops" class="stat-val">14 stops</strong>
             </div>
           </div>
         </div>
@@ -628,6 +636,14 @@
           <button id="close-drawer-btn" class="close-btn drawer-close-btn" aria-label="Close Route Details" title="Close Route Details (Esc)">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
+        </div>
+
+        <!-- Official Route & Timetable Link Row (Issue #18) -->
+        <div class="drawer-official-link-row" id="drawer-official-link-row">
+          <a id="drawer-official-link" class="drawer-official-link-btn" href="#" target="_blank" rel="noopener noreferrer" title="Open Official Route &amp; Timetable in a new tab">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            <span id="drawer-official-link-text">Official PTV Route &amp; Timetable ↗</span>
+          </a>
         </div>
 
         <!-- Service Variations Segmented Controls (for routes with variations like 305) -->
