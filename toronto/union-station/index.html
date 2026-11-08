@@ -102,11 +102,18 @@
       background-color: #0f172a;
     }
   </style>
-  <!-- Google tag (gtag.js) with Tester Opt-Out Switch (?optout=1 / ?optout=0) -->
+  <!-- Google tag (gtag.js) with Environment Isolation & Opt-Out Switch (?optout=1 / ?optout=0) -->
   <script>
     (function() {
       var GA_ID = 'G-PXS9EB0K7K';
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      window.gtag = gtag;
+
       try {
+        var host = (window.location && window.location.hostname) || '';
+        var port = (window.location && window.location.port) || '';
+        var proto = (window.location && window.location.protocol) || '';
         var params = new URLSearchParams(window.location.search);
         var optout = params.get('optout');
         if (optout === '1') {
@@ -114,20 +121,35 @@
         } else if (optout === '0') {
           localStorage.removeItem('ga_optout');
         }
-        if (localStorage.getItem('ga_optout') === 'true') {
-          window['ga-disable-G-PXS9EB0K7K'] = true;
-          console.info('🚫 [GA4] Google Analytics tracking is disabled for this browser (optout active).');
-        }
-      } catch (e) {}
-    })();
-  </script>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PXS9EB0K7K"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
 
-    gtag('config', 'G-PXS9EB0K7K');
+        var isLocal = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host.endsWith('.local') || proto === 'file:';
+        var isCustomPort = port === '8080' || port === '8180' || port === '3000' || port === '8000';
+        var isTestingHost = host.includes('padev') || (host.endsWith('pythonanywhere.com') && host !== 'geohoo.pythonanywhere.com');
+        var isOptout = localStorage.getItem('ga_optout') === 'true';
+
+        var isProduction = (host === 'catchdaride.github.io' || host === 'geohoo.pythonanywhere.com' || host === 'catchdaride.com' || host === 'www.catchdaride.com') && !isLocal && !isCustomPort && !isTestingHost;
+
+        if (!isProduction || isOptout) {
+          window['ga-disable-' + GA_ID] = true;
+          window['ga-disable-G-PXS9EB0K7K'] = true;
+          var reason = isOptout ? 'tester opt-out active' : ('non-production environment [' + (host || 'local') + (port ? ':' + port : '') + ']');
+          console.info('🚫 [GA4] Google Analytics tracking is disabled: ' + reason + '.');
+          return;
+        }
+
+        // Production only: Dynamically load Google Tag Manager script
+        var gaScript = document.createElement('script');
+        gaScript.async = true;
+        gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+        document.head.appendChild(gaScript);
+
+        gtag('js', new Date());
+        gtag('config', GA_ID);
+      } catch (e) {
+        window['ga-disable-' + GA_ID] = true;
+        window['ga-disable-G-PXS9EB0K7K'] = true;
+      }
+    })();
   </script>
 </head>
 <body data-deep-link="?lat=43.6453&lon=-79.3806&radius=400">
@@ -371,7 +393,7 @@
                   <span class="about-badge-beta">BETA</span>
                 </div>
                 <div class="about-version-row">
-                  <span class="about-version-badge">Version 0.7.0</span>
+                  <span class="about-version-badge">Version 0.7.1</span>
                 </div>
                 <p class="about-app-desc">Interactive public transit catchment &amp; walking radius explorer</p>
               </div>
