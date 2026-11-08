@@ -46,9 +46,24 @@ function getApiBase() {
   return '';
 }
 
+// Environment detection helper: Returns true only on production Tier 1 / Tier 2 domains
+function isProductionAnalyticsEnvironment() {
+  try {
+    const host = (window.location && window.location.hostname) || '';
+    const port = (window.location && window.location.port) || '';
+    const proto = (window.location && window.location.protocol) || '';
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host.endsWith('.local') || proto === 'file:') return false;
+    if (port === '8080' || port === '8180' || port === '3000' || port === '8000') return false;
+    if (host.includes('padev') || (host.endsWith('pythonanywhere.com') && host !== 'geohoo.pythonanywhere.com')) return false;
+    return host === 'catchdaride.github.io' || host === 'geohoo.pythonanywhere.com' || host === 'catchdaride.com' || host === 'www.catchdaride.com';
+  } catch (_) {
+    return false;
+  }
+}
+
 // Safely dispatch custom events to Google Analytics (GA4)
 function trackAnalyticsEvent(eventName, params = {}) {
-  if (window['ga-disable-G-PXS9EB0K7K']) return;
+  if (window['ga-disable-G-PXS9EB0K7K'] || !isProductionAnalyticsEnvironment()) return;
   if (typeof window.gtag === 'function') {
     try {
       window.gtag('event', eventName, params);
@@ -2537,7 +2552,7 @@ class BusMapApp {
     const cityName = (data.agency && (data.agency.city_name || data.agency.cityName)) || data.agencyId || 'Unknown';
     const agencyId = data.agencyId || (data.agency && data.agency.agency_id) || '';
 
-    if (typeof window.gtag === 'function' && !window['ga-disable-G-PXS9EB0K7K']) {
+    if (typeof window.gtag === 'function' && !window['ga-disable-G-PXS9EB0K7K'] && isProductionAnalyticsEnvironment()) {
       try {
         window.gtag('set', {
           agency_id: agencyId,
