@@ -468,14 +468,60 @@ function getRouteStrokeStyle(route) {
   };
 }
 
-// Helper to extract primary coordinate array from either GeoJSON array or composite variation object
+// Google Encoded Polyline decoder (5-decimal precision) returning [[lon, lat], ...]
+function decodePolyline(encoded) {
+  if (!encoded || typeof encoded !== 'string') return [];
+  const points = [];
+  let index = 0, len = encoded.length;
+  let lat = 0, lng = 0;
+  while (index < len) {
+    let b, shift = 0, result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = (result & 1) !== 0 ? ~(result >> 1) : (result >> 1);
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = (result & 1) !== 0 ? ~(result >> 1) : (result >> 1);
+    lng += dlng;
+
+    points.push([lng * 1e-5, lat * 1e-5]);
+  }
+  return points;
+}
+
+// Helper to extract primary coordinate array from either GeoJSON array, encoded polyline string, or composite variation object
 function getRouteCoordinates(geomData) {
   if (!geomData) return [];
-  if (Array.isArray(geomData)) return geomData;
-  if (geomData.composite && geomData.composite.coordinates) return geomData.composite.coordinates;
-  if (geomData.trunk && geomData.trunk.coordinates) return geomData.trunk.coordinates;
+  if (typeof geomData === 'string') return decodePolyline(geomData);
+  if (Array.isArray(geomData)) {
+    if (geomData.length > 0 && typeof geomData[0] === 'string') {
+      return geomData.map(b => decodePolyline(b));
+    }
+    return geomData;
+  }
+  if (geomData.composite && geomData.composite.coordinates) {
+    const coords = geomData.composite.coordinates;
+    return typeof coords === 'string' ? decodePolyline(coords) : coords;
+  }
+  if (geomData.trunk && geomData.trunk.coordinates) {
+    const coords = geomData.trunk.coordinates;
+    return typeof coords === 'string' ? decodePolyline(coords) : coords;
+  }
   const values = Object.values(geomData);
-  if (values.length > 0 && values[0].coordinates) return values[0].coordinates;
+  if (values.length > 0 && values[0].coordinates) {
+    const coords = values[0].coordinates;
+    return typeof coords === 'string' ? decodePolyline(coords) : coords;
+  }
   return [];
 }
 
@@ -590,26 +636,14 @@ function findRouteNearestVertex(route, queryPoint, geomData) {
   };
 
   if (geomData) {
-    if (Array.isArray(geomData)) {
-      if (geomData.length > 0 && Array.isArray(geomData[0]) && Array.isArray(geomData[0][0])) {
-        for (const branch of geomData) {
+    const coords = getRouteCoordinates(geomData);
+    if (Array.isArray(coords)) {
+      if (coords.length > 0 && Array.isArray(coords[0]) && Array.isArray(coords[0][0])) {
+        for (const branch of coords) {
           for (const pt of branch) checkPoint(pt[1], pt[0]);
         }
       } else {
-        for (const pt of geomData) checkPoint(pt[1], pt[0]);
-      }
-    } else if (typeof geomData === 'object') {
-      for (const key of Object.keys(geomData)) {
-        const part = geomData[key];
-        if (part && Array.isArray(part.coordinates)) {
-          if (part.coordinates.length > 0 && Array.isArray(part.coordinates[0]) && Array.isArray(part.coordinates[0][0])) {
-            for (const branch of part.coordinates) {
-              for (const pt of branch) checkPoint(pt[1], pt[0]);
-            }
-          } else {
-            for (const pt of part.coordinates) checkPoint(pt[1], pt[0]);
-          }
-        }
+        for (const pt of coords) checkPoint(pt[1], pt[0]);
       }
     }
   }
@@ -2992,11 +3026,12 @@ class BusMapApp {
         });
       };
 
-      if (typeof geomData === 'object' && !Array.isArray(geomData)) {
+      if (typeof geomData === 'object' && geomData !== null && !Array.isArray(geomData)) {
         // Render composite segments
         const featureGroup = L.featureGroup();
         for (const [key, part] of Object.entries(geomData)) {
-          const partLatLngs = part.coordinates.map(c => [c[1], c[0]]);
+          const rawCoords = typeof part.coordinates === 'string' ? decodePolyline(part.coordinates) : (part.coordinates || []);
+          const partLatLngs = rawCoords.map(c => [c[1], c[0]]);
           const segmentLayer = createStyledRouteSegment(
             partLatLngs,
             route,
