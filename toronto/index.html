@@ -16,13 +16,13 @@
   <meta property="og:title" content="Toronto & GTHA Public Transit Catchment Explorer | Catch Da Ride!">
   <meta property="og:description" content="Explore Toronto Transit Commission (TTC) Subways, Streetcars, and GO Transit regional commuter trains across the Greater Toronto Area.">
   <meta property="og:url" content="https://catchdaride.github.io/toronto/">
-  <meta property="og:image" content="https://geohoo.pythonanywhere.com/og_preview.png">
+  <meta property="og:image" content="https://catchdaride.github.io/og_preview.png">
 
   <!-- Twitter / X -->
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Toronto & GTHA Public Transit Catchment Explorer | Catch Da Ride!">
   <meta name="twitter:description" content="Explore Toronto Transit Commission (TTC) Subways, Streetcars, and GO Transit regional commuter trains across the Greater Toronto Area.">
-  <meta name="twitter:image" content="https://geohoo.pythonanywhere.com/og_preview.png">
+  <meta name="twitter:image" content="https://catchdaride.github.io/og_preview.png">
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
@@ -137,7 +137,7 @@
     })();
   </script>
 </head>
-<body data-deep-link="?lat=43.6453&lon=-79.3806&radius=400">
+<body>
 <div id="app-container" class="app-container">
     
     <!-- Top Floating Control Bar -->
@@ -372,7 +372,7 @@
                   <span class="about-badge-beta">BETA</span>
                 </div>
                 <div class="about-version-row">
-                  <span class="about-version-badge">Version 0.7.5a</span>
+                  <span class="about-version-badge">Version 0.7.6</span>
                 </div>
                 <p class="about-app-desc">Interactive public transit catchment &amp; walking radius explorer</p>
               </div>
@@ -407,7 +407,26 @@
 
             <div class="about-footer">
               <span class="about-footer-icon">🌏</span>
-              <span class="about-footer-text">Covering 15 regions across Australia, US, UK, Canada &amp; Hong Kong</span>
+              <div class="about-footer-content">
+                <span class="about-footer-text">Covering 15 regions across Australia, US, UK, Canada &amp; Hong Kong</span>
+                <nav class="about-regions-nav" aria-label="Supported Transit Regions">
+                  <a href="/melbourne/">Melbourne</a>
+                  <a href="/sydney/">Sydney</a>
+                  <a href="/brisbane/">Brisbane</a>
+                  <a href="/adelaide/">Adelaide</a>
+                  <a href="/perth/">Perth</a>
+                  <a href="/canberra/">Canberra</a>
+                  <a href="/hobart/">Hobart</a>
+                  <a href="/darwin/">Darwin</a>
+                  <a href="/london/">London</a>
+                  <a href="/birmingham/">Birmingham</a>
+                  <a href="/toronto/">Toronto</a>
+                  <a href="/vancouver/">Vancouver</a>
+                  <a href="/hong-kong/">Hong Kong</a>
+                  <a href="/san-francisco/">San Francisco</a>
+                  <a href="/new-york/">New York</a>
+                </nav>
+              </div>
             </div>
           </div>
         </div>
