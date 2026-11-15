@@ -957,6 +957,11 @@ class BusMapApp {
     this.initGeolocationDefault();
   }
 
+  isSearchCrawlerOrBot() {
+    if (typeof navigator === 'undefined' || !navigator.userAgent) return false;
+    return /(Googlebot|AdsBot|Mediapartners-Google|InspectionTool|Storebot-Google|bingbot|Applebot|baiduspider|yandex|duckduckbot|slurp|facebookexternalhit|twitterbot|linkedinbot)/i.test(navigator.userAgent);
+  }
+
   encodeGeohash(lat, lon, precision = 7) {
     return encodeGeohash(lat, lon, precision);
   }
@@ -2227,6 +2232,7 @@ class BusMapApp {
 
   updateUrlCoordinates(lat, lon, radius) {
     try {
+      if (this.isSearchCrawlerOrBot()) return;
       if (typeof window === 'undefined' || !window.history || !window.history.replaceState) return;
       const targetLat = (lat !== undefined && lat !== null) ? Number(lat) : (this.queryPoint ? Number(this.queryPoint.lat) : null);
       const targetLon = (lon !== undefined && lon !== null) ? Number(lon) : (this.queryPoint ? Number(this.queryPoint.lon) : null);
@@ -2319,7 +2325,9 @@ class BusMapApp {
     this.catchmentCircle.setLatLng([lat, lon]);
     this.triggerPinDropRipple(lat, lon);
     this.updateViewportCatchmentPill();
-    this.updateUrlCoordinates(lat, lon);
+    if (!this._skipUrlUpdateOnAutoGeo) {
+      this.updateUrlCoordinates(lat, lon);
+    }
     this.loadCatchment();
     const modal = document.getElementById('saved-locations-modal');
     if (modal && !modal.classList.contains('hidden') && typeof this.renderSavedLocationsModal === 'function') {
@@ -2331,6 +2339,7 @@ class BusMapApp {
   }
 
   async initGeolocationDefault() {
+    if (this.isSearchCrawlerOrBot()) return;
     // If arriving via an explicit deep-link (e.g. from an SEO hub landing page),
     // preserve the deep-linked location and do NOT overwrite it with device GPS.
     if (this.isDeepLinked) {
@@ -2392,7 +2401,12 @@ class BusMapApp {
         );
 
         if (inCoverage) {
-          this.setQueryLocation(lat, lon);
+          this._skipUrlUpdateOnAutoGeo = true;
+          try {
+            this.setQueryLocation(lat, lon);
+          } finally {
+            this._skipUrlUpdateOnAutoGeo = false;
+          }
           if (this.map) {
             this.map.flyTo([lat, lon], 15);
           }
@@ -2490,7 +2504,6 @@ class BusMapApp {
   }
 
   async loadCatchment() {
-    this.updateUrlCoordinates();
     const cacheKey = `${this.queryPoint.lat.toFixed(4)}_${this.queryPoint.lon.toFixed(4)}_${this.currentRadius}`;
     if (this.catchmentCache && this.catchmentCache.has(cacheKey)) {
       const cached = this.catchmentCache.get(cacheKey);
