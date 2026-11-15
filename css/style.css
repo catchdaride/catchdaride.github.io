@@ -2669,7 +2669,7 @@ path.leaflet-interactive:active,
 /* About Footer */
 .about-footer {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   font-size: 11px;
   color: #64748b;
@@ -2679,6 +2679,32 @@ path.leaflet-interactive:active,
 .about-footer-icon {
   font-size: 14px;
   flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.about-footer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.about-regions-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 11px;
+}
+
+.about-regions-nav a {
+  color: #38bdf8;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.about-regions-nav a:hover,
+.about-regions-nav a:focus-visible {
+  color: #7dd3fc;
+  text-decoration: underline;
 }
 
 /* ==========================================================================
